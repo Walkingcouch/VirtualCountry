@@ -1,0 +1,39 @@
+{
+  "name": "virtual-country",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "Virtual Country: a First Nations-led ICIP platform and living archive. Proprietary to First Geospatial Pty Ltd.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "seed:sql": "tsx scripts/seed.ts --out supabase/seed.sql"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.117.3",
+    "libsodium-wrappers-sumo": "0.8.4",
+    "mapbox-gl": "3.32.0",
+    "next": "16.4.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-map-gl": "8.1.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/libsodium-wrappers-sumo": "0.7.8",
+    "@types/node": "22.15.0",
+    "@types/react": "19.1.0",
+    "@types/react-dom": "19.1.0",
+    "tailwindcss": "4.3.3",
+    "tsx": "4.19.4",
+    "typescript": "5.8.3",
+    "vitest": "5.0.3"
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true,
+    "esbuild@0.28.2": true
+  }
+}
