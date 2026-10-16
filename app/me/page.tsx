@@ -64,6 +64,7 @@ export default function Me() {
           <li>New phone: sign in, then open with your passphrase or recovery card.</li>
           <li>Lost everything: ask your Community Administrator for in-person recovery. Two Recovery Keepers confirm who you are face to face. Nobody can read your stories at any point.</li>
         </ul>
+        <p className="text-sm text-mute mt-3">Help from First Geospatial: <a className="underline" href="mailto:contact@firstgeospatial.com.au">contact@firstgeospatial.com.au</a>. We can help with access problems, but we can never open your stories.</p>
       </div>
     </div>
   );

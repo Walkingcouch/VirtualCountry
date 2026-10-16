@@ -101,6 +101,7 @@ export default function Login() {
               ))}
             </div>
             <p className="text-white/40 text-xs mt-4">Demo password {DEMO_PASSWORD} · demo passphrase {DEMO_PASSPHRASE}</p>
+            <p className="text-white/60 text-sm mt-4">Need help? <a className="underline" href="mailto:contact@firstgeospatial.com.au">contact@firstgeospatial.com.au</a></p>
           </section>
         )}
       </div>

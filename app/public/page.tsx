@@ -49,6 +49,7 @@ export default function PublicReleases() {
             </article>
           ))}
         </div>
+        <p className="text-sm text-mute mt-10">Questions about these summaries, or about Virtual Country: <a className="underline" href="mailto:contact@firstgeospatial.com.au">contact@firstgeospatial.com.au</a></p>
       </div>
     </main>
   );

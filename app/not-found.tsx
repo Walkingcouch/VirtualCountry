@@ -21,6 +21,7 @@ export default function NotFound() {
           <Link href="/" className="btn btn-gold flex-1">Go to home</Link>
           <button onClick={startAgain} className="btn btn-line !text-white !border-white/40 flex-1">Sign out and start again</button>
         </div>
+        <p className="text-white/60 text-sm mt-6">Still stuck? Email <a className="underline" href="mailto:contact@firstgeospatial.com.au">contact@firstgeospatial.com.au</a></p>
       </div>
     </main>
   );

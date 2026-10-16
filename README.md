@@ -135,4 +135,6 @@ These are deliberate shortcuts for the sandbox. They are listed in `docs/BUILD_P
 - Legacy keepers judge whether a condition is met (age, passing). The app does not check dates of birth or death records.
 - The map is an invented drawing, not real geography.
 
+Contact: contact@firstgeospatial.com.au
+
 © First Geospatial Pty Ltd. Proprietary and confidential.
