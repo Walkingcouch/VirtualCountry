@@ -61,7 +61,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-10">
       <header className="bg-ink text-white sticky top-0 z-30">
         <div className="max-w-6xl mx-auto px-4 h-[72px] flex items-center gap-3 lg:gap-4">
-          <Link href="/" aria-label="Home" className="shrink-0"><Logo className="h-9 sm:h-11" /></Link>
+          <Link href="/" aria-label="Home" className="shrink-0"><Logo variant="compact" className="h-9 sm:h-12" /></Link>
           <div className="hidden md:block h-7 w-px bg-white/20" />
           <div className="hidden sm:block min-w-0">
             {active.length > 1 ? (
@@ -155,7 +155,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   if (isPublic) return <>{children}</>;
 
   if (status === 'loading' || status === 'signed_out' || status === 'needs_setup') {
-    return <div className="min-h-screen bg-ink flex items-center justify-center"><Logo className="h-12 opacity-80" /></div>;
+    return <div className="min-h-screen bg-ink flex items-center justify-center"><Logo className="h-16 opacity-80" /></div>;
   }
 
   if (status === 'locked') return <Unlock />;

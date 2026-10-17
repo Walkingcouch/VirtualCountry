@@ -66,7 +66,7 @@ export default function Login() {
 
   return (
     <main className="min-h-screen bg-ink text-white">
-      <div className="max-w-6xl mx-auto px-4 py-6"><Link href="/"><Logo className="h-12 sm:h-14" /></Link></div>
+      <div className="max-w-6xl mx-auto px-4 py-6"><Link href="/"><Logo className="h-14 sm:h-20" /></Link></div>
       <div className="max-w-6xl mx-auto px-4 grid lg:grid-cols-[1fr_1.3fr] gap-10 pb-16">
         <section>
           <div className="label label-dark mb-3">Sign in</div>

@@ -2,9 +2,12 @@
   "name": "Virtual Country",
   "short_name": "Virtual Country",
   "description": "A First Nations-led ICIP platform and living archive",
-  "start_url": "app",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#10151B",
   "theme_color": "#10151B",
-  "icons": [{ "src": "/brand/icon.png", "sizes": "512x512", "type": "image/png" }]
+  "icons": [
+    { "src": "/brand/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/brand/icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
 }

@@ -34,8 +34,8 @@ export default function Unlock() {
   return (
     <main className="min-h-screen bg-ink text-white flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <div className="flex items-center justify-between mb-8">
-          <Logo className="h-12" />
+        <div className="flex flex-col items-start gap-3 mb-8">
+          <Logo className="h-14 sm:h-16" />
           <button className="text-sm text-white/70 underline" onClick={signOut}>← Not you? Sign out</button>
         </div>
         <div className="label label-dark mb-2">Your private space is locked</div>

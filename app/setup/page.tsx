@@ -47,7 +47,7 @@ export default function Setup() {
   return (
     <main className="min-h-screen bg-ink text-white flex items-center justify-center p-4">
       <div className="w-full max-w-lg">
-        <Logo className="h-12 mb-8" />
+        <Logo className="h-16 mb-8" />
         <div className="label label-dark mb-2">Set up · step {step} of 3</div>
         {step === 1 && (
           <>

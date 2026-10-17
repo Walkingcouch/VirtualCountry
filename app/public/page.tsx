@@ -20,7 +20,7 @@ export default function PublicReleases() {
     <main className="min-h-screen bg-paper">
       <header className="bg-ink">
         <div className="max-w-5xl mx-auto px-4 h-20 flex items-center justify-between">
-          <Link href="/"><Logo className="h-12" /></Link>
+          <Link href="/"><Logo className="h-12 sm:h-14" /></Link>
           <Link href="/login" className="btn btn-gold">Sign in →</Link>
         </div>
       </header>

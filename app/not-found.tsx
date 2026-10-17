@@ -13,7 +13,7 @@ export default function NotFound() {
   return (
     <main className="min-h-screen bg-ink text-white flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <Logo className="h-12 mb-8" />
+        <Logo className="h-16 mb-8" />
         <div className="label label-dark mb-2">Page not found</div>
         <h1 className="font-head font-extrabold text-3xl mb-3">THIS PAGE <span className="text-gold">DOES NOT EXIST</span></h1>
         <p className="text-white/75 mb-6">The link may be old. Nothing is wrong with your account.</p>
