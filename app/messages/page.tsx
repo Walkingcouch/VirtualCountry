@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from '@/lib/session';
-import { conversationActivity, createConversation, listBridges, listConversations, loadMessages, membersOf, sendMessage, type BridgeInfo, type ChatMessage, type Conversation } from '@/lib/data';
+import { acceptBridge, allOrgs, bridgeAction, bridgePeople, conversationActivity, createConversation, listBridges, listConversations, loadMessages, membersOf, requestBridge, sendMessage, type BridgeInfo, type ChatMessage, type Conversation } from '@/lib/data';
 import { markRead, readMap } from '@/lib/notifications';
 import { supabase } from '@/lib/supabase';
 
@@ -15,8 +15,19 @@ const when = (iso?: string) => {
 };
 
 export default function Messages() {
-  const { keys, userId, org, dir, nameOf } = useSession();
+  const { keys, userId, org, dir, nameOf: dirName } = useSession();
   const [tab, setTab] = useState<Tab>('chats');
+  const [bridgeNames, setBridgeNames] = useState<Map<string, { name: string; org: string }>>(new Map());
+  const [orgList, setOrgList] = useState<{ id: string; name: string; kind: string }[]>([]);
+  const [askOrg, setAskOrg] = useState('');
+  const [bridgeMsg, setBridgeMsg] = useState('');
+  const [bridgeBusy, setBridgeBusy] = useState('');
+  /** Names of people in my organisation, or on a bridge I am on (with their organisation). */
+  const nameOf = useCallback((id: string | null | undefined) => {
+    const b = id ? bridgeNames.get(id) : undefined;
+    if (b && !dir?.members.some((m) => m.user_id === id)) return `${b.name.split(' (')[0]} (${b.org})`;
+    return dirName(id);
+  }, [bridgeNames, dir, dirName]);
   const [convs, setConvs] = useState<Conversation[]>([]);
   const [members, setMembers] = useState<Map<string, string[]>>(new Map());
   const [activity, setActivity] = useState<Map<string, { at: string; sender: string; count: number }>>(new Map());
@@ -43,6 +54,8 @@ export default function Messages() {
     setActivity(a);
     if (userId) setRead(readMap(userId));
     if (org) setBridges(await listBridges(org.id));
+    bridgePeople().then(setBridgeNames).catch(() => {});
+    if (org?.is_admin) allOrgs().then(setOrgList).catch(() => {});
     const { data } = await supabase().from('public_keys').select('user_id, sign_pk');
     setSignKeys(new Map((data ?? []).map((r) => [r.user_id, r.sign_pk])));
     return c;
@@ -62,7 +75,9 @@ export default function Messages() {
   // First load, and open a chat from a notification link (?c=<id>)
   useEffect(() => {
     refresh().then((c) => {
-      const id = new URLSearchParams(window.location.search).get('c');
+      const qs = new URLSearchParams(window.location.search);
+      if (qs.get('tab') === 'bridges') setTab('bridges');
+      const id = qs.get('c');
       const target = id ? c.find((x) => x.id === id) : null;
       if (target) { setTab(target.kind === 'bridge' ? 'bridges' : 'chats'); open(target); }
     }).catch((e) => setErr(e.message));
@@ -123,9 +138,22 @@ export default function Messages() {
     return !!a && a.sender !== userId && (!read[c.id] || read[c.id] < a.at);
   };
   const byRecent = (a: Conversation, b: Conversation) => (activity.get(b.id)?.at ?? b.created_at).localeCompare(activity.get(a.id)?.at ?? a.created_at);
-  const direct = convs.filter((c) => c.kind === 'direct').sort(byRecent);
-  const groups = convs.filter((c) => c.kind === 'group').sort(byRecent);
-  const bridgeConvs = convs.filter((c) => c.kind === 'bridge').sort(byRecent);
+  // Show this organisation's chats, and the bridges this organisation is on
+  const myBridgeConvIds = new Set(bridges.filter((b) => b.kind === 'bridge' && b.conversation_id).map((b) => b.conversation_id as string));
+  const direct = convs.filter((c) => c.kind === 'direct' && c.org_id === org?.id).sort(byRecent);
+  const groups = convs.filter((c) => c.kind === 'group' && c.org_id === org?.id).sort(byRecent);
+  const bridgeConvs = convs.filter((c) => c.kind === 'bridge' && myBridgeConvIds.has(c.id)).sort(byRecent);
+  const bridgeOf = (convId: string) => bridges.find((b) => b.kind === 'bridge' && b.conversation_id === convId);
+  const incoming = bridges.filter((b) => b.kind === 'request' && b.status === 'pending' && b.direction === 'incoming');
+  const outgoing = bridges.filter((b) => b.kind === 'request' && b.status === 'pending' && b.direction === 'outgoing');
+  const openBridges = bridges.filter((b) => b.kind === 'bridge');
+  const blocked = new Set(bridges.filter((b) => (b.kind === 'request' && b.status === 'pending') || (b.kind === 'bridge' && b.status === 'active')).map((b) => b.other_org));
+  const askable = orgList.filter((o) => o.id !== org?.id && !blocked.has(o.name));
+
+  const doBridge = async (key: string, fn: () => Promise<unknown>, ok: string) => {
+    setBridgeBusy(key); setBridgeMsg('');
+    try { await fn(); setBridgeMsg(ok); await refresh(); } catch (e) { setBridgeMsg((e as Error).message); } finally { setBridgeBusy(''); }
+  };
   const unreadChats = [...direct, ...groups].filter(isUnread).length;
   const unreadBridges = bridgeConvs.filter(isUnread).length;
 
@@ -224,18 +252,56 @@ export default function Messages() {
             </>
           ) : (
             <>
+              {bridgeMsg && <p className="card p-3 text-sm border-gold" role="status">{bridgeMsg}</p>}
+              {org?.is_admin && incoming.length > 0 && (
+                <section className="card p-4 border-gold">
+                  <h2 className="font-head font-semibold mb-2">Bridge requests for you to answer</h2>
+                  {incoming.map((b) => (
+                    <div key={b.id} className="py-2 border-t border-line first:border-0 text-sm">
+                      <div><b>{b.other_org}</b> asks to open a bridge{b.requested_by ? ` (asked by ${b.requested_by.split(' (')[0]})` : ''}.</div>
+                      <p className="text-xs text-mute mt-1">If you accept, the administrators of both organisations can message each other. Every member of both organisations will see that the bridge exists and when it is used.</p>
+                      <div className="flex gap-2 mt-2">
+                        <button className="btn btn-gold !min-h-9" disabled={!!bridgeBusy} onClick={() => doBridge(b.id, async () => { const id = await acceptBridge(b.id, keys!, userId!); const c = await refresh(); const made = c.find((x) => x.id === id); if (made) await open(made); }, `Bridge to ${b.other_org} is open.`)}>{bridgeBusy === b.id ? 'Opening…' : 'Accept'}</button>
+                        <button className="btn btn-line !min-h-9" disabled={!!bridgeBusy} onClick={() => doBridge(b.id, () => bridgeAction(b.id, 'decline'), 'Request declined.')}>Decline</button>
+                      </div>
+                    </div>
+                  ))}
+                </section>
+              )}
               <section className="card overflow-hidden">
                 <h2 className="px-4 pt-3 pb-1 label">Bridges you are on</h2>
-                {bridgeConvs.length === 0 && <p className="px-4 pb-3 text-sm text-mute">Only administrators are on bridges.</p>}
-                <div className="divide-y divide-line">{bridgeConvs.map((c) => <Row key={c.id} c={c} sub="Between organisations" />)}</div>
+                {bridgeConvs.length === 0 && <p className="px-4 pb-3 text-sm text-mute">{org?.is_admin ? 'None yet. Ask another organisation below.' : 'Only administrators are on bridges.'}</p>}
+                <div className="divide-y divide-line">{bridgeConvs.map((c) => <Row key={c.id} c={c} sub={bridgeOf(c.id)?.status === 'active' ? `With ${bridgeOf(c.id)?.other_org ?? 'another organisation'}` : 'Closed'} />)}</div>
               </section>
+              {org?.is_admin && (
+                <section className="card p-4">
+                  <h2 className="font-head font-semibold mb-1">Ask for a bridge</h2>
+                  <p className="text-xs text-mute mb-2">A bridge lets administrators of two organisations message each other. Their administrator must accept before it opens.</p>
+                  <div className="flex gap-2">
+                    <select className="select flex-1 min-w-0" value={askOrg} onChange={(e) => setAskOrg(e.target.value)} aria-label="Organisation to ask">
+                      <option value="">Choose an organisation</option>
+                      {askable.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+                    </select>
+                    <button className="btn btn-ink !min-h-10" disabled={!askOrg || !!bridgeBusy} onClick={() => doBridge('ask', async () => { await requestBridge(org!.id, askOrg); setAskOrg(''); }, 'Request sent. Their administrator will see it under Bridges and in Notifications.')}>Ask</button>
+                  </div>
+                  {outgoing.map((b) => (
+                    <div key={b.id} className="flex items-center justify-between gap-2 text-sm mt-3 pt-3 border-t border-line">
+                      <span>Waiting for <b>{b.other_org}</b> to accept</span>
+                      <button className="underline text-mute" disabled={!!bridgeBusy} onClick={() => doBridge(b.id, () => bridgeAction(b.id, 'withdraw'), 'Request withdrawn.')}>Withdraw</button>
+                    </div>
+                  ))}
+                </section>
+              )}
               <section className="card p-4">
                 <h2 className="font-head font-semibold mb-2">All bridges (visible to every member)</h2>
-                {bridges.length === 0 && <p className="text-sm text-mute">No bridges to other organisations.</p>}
-                {bridges.map((b) => (
-                  <div key={b.bridge_id} className="text-sm py-2 border-t border-line first:border-0">
-                    <div>⇄ <b>{b.other_org}</b> · {b.status}</div>
-                    <div className="text-mute">Administrators: {b.participants.join(', ')}</div>
+                {openBridges.length === 0 && incoming.length === 0 && outgoing.length === 0 && <p className="text-sm text-mute">No bridges to other organisations.</p>}
+                {[...incoming, ...outgoing].map((b) => (
+                  <div key={b.id} className="text-sm py-2 border-t border-line first:border-0">⇄ <b>{b.other_org}</b> · <span className="chip chip-warn">waiting for {b.direction === 'incoming' ? 'us' : 'them'} to accept</span></div>
+                ))}
+                {openBridges.map((b) => (
+                  <div key={b.id} className="text-sm py-2 border-t border-line first:border-0">
+                    <div>⇄ <b>{b.other_org}</b> · {b.status === 'active' ? 'open' : b.status}</div>
+                    <div className="text-mute">Administrators: {b.participants.map((x) => x.split(' (')[0]).join(', ')}</div>
                     <div className="text-mute">{b.message_count} messages · last {b.last_message_at ? new Date(b.last_message_at).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' }) : 'never'}</div>
                   </div>
                 ))}
@@ -263,6 +329,10 @@ export default function Messages() {
                   <div className="font-head font-semibold truncate">{nameFor(active)}</div>
                   <div className="text-xs text-mute truncate">{active.kind === 'bridge' ? 'Bridge. Members of both organisations can see it exists and when it is used.' : active.kind === 'group' ? groupSub(active) : 'Direct chat · locked end to end'}</div>
                 </div>
+                {active.kind === 'bridge' && org?.is_admin && bridgeOf(active.id)?.status === 'active' && (
+                  <button className="ml-auto shrink-0 btn btn-line !min-h-9 !px-3 !py-1 text-xs" disabled={!!bridgeBusy}
+                    onClick={() => { const b = bridgeOf(active.id)!; if (confirm(`Close the bridge with ${b.other_org}? Nobody will be able to post on it. The record that it existed stays in both governance logs.`)) doBridge(b.id, () => bridgeAction(b.id, 'close'), 'Bridge closed.'); }}>Close bridge</button>
+                )}
               </div>
               <div ref={scroller} onScroll={(e) => { const el = e.currentTarget; atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60; }}
                 className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-3 bg-white">
@@ -270,17 +340,21 @@ export default function Messages() {
                 {msgs.map((m) => (
                   <div key={m.id} className={m.sender_id === userId ? 'text-right' : ''}>
                     <div className={`inline-block max-w-[85%] text-left rounded-2xl px-3 py-2 ${m.sender_id === userId ? 'bg-ink text-white rounded-br-sm' : 'bg-sand rounded-bl-sm'}`}>
-                      <div className="text-[11px] opacity-70 mb-0.5">{m.sender_id === userId ? 'You' : nameOf(m.sender_id).split(' (')[0]} · {when(m.created_at)} {m.verified ? '✓' : '⚠'}</div>
+                      <div className="text-[11px] opacity-70 mb-0.5">{m.sender_id === userId ? 'You' : active.kind === 'bridge' && !dir?.members.some((x) => x.user_id === m.sender_id) ? nameOf(m.sender_id) : nameOf(m.sender_id).split(' (')[0]} · {when(m.created_at)} {m.verified ? '✓' : '⚠'}</div>
                       <div className="whitespace-pre-wrap break-words">{m.text}</div>
                     </div>
                   </div>
                 ))}
               </div>
               {err && <p className="text-danger text-sm px-3 pt-2" role="alert">{err}</p>}
+              {active.kind === 'bridge' && bridgeOf(active.id) && bridgeOf(active.id)!.status !== 'active' ? (
+                <p className="p-3 border-t border-line bg-paper text-sm text-mute pb-[calc(.75rem+env(safe-area-inset-bottom))]">This bridge is closed. Messages stay readable, but nobody can post.</p>
+              ) : (
               <form className="p-3 border-t border-line flex gap-2 bg-paper pb-[calc(.75rem+env(safe-area-inset-bottom))]" onSubmit={(e) => { e.preventDefault(); send(); }}>
                 <input className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder="Write a message" aria-label="Message" />
                 <button className="btn btn-gold">Send</button>
               </form>
+              )}
             </>
           )}
         </section>

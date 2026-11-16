@@ -32,6 +32,7 @@ const MORE = [
   { href: '/releases', label: 'Releases', icon: 'releases' },
   { href: '/community', label: 'Community', icon: 'community' },
   { href: '/legacy', label: 'Legacy', icon: 'legacy' },
+  { href: '/organisations', label: 'Organisations', icon: 'orgs' },
   { href: '/notifications', label: 'Notifications', icon: 'bell' },
   { href: '/me', label: 'Me', icon: 'me' },
 ];

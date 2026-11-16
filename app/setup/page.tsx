@@ -3,7 +3,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useSession } from '@/lib/session';
 import { createVault } from '@/lib/vault';
-import { allOrgs } from '@/lib/data';
+import { allOrgs, createOrg } from '@/lib/data';
 import { supabase } from '@/lib/supabase';
 import Logo from '@/components/Logo';
 
@@ -33,6 +33,13 @@ export default function Setup() {
       setKeys(r.keys);
       setStep(2);
     } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
+  };
+
+  const [newName, setNewName] = useState('');
+  const startNew = async () => {
+    setBusy(true); setErr('');
+    try { await createOrg(newName, 'community'); await refresh(); router.replace('/community'); }
+    catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
   };
 
   const join = async (orgId: string) => {
@@ -85,6 +92,14 @@ export default function Setup() {
                 </button>
               ))}
               {err && <p className="text-[#F3B0A8] text-sm">{err}</p>}
+            </div>
+            <div className="mt-6 pt-5 border-t border-white/15">
+              <div className="font-head font-semibold mb-1">Or start a new organisation</div>
+              <p className="text-white/60 text-sm mb-3">You become its first administrator. Use this to set up your own community or partner organisation for testing.</p>
+              <div className="flex gap-2">
+                <input className="input !bg-white/5 !text-white !border-white/20" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Organisation name" aria-label="New organisation name" maxLength={80} />
+                <button className="btn btn-gold" disabled={busy || newName.trim().length < 3} onClick={startNew}>Start</button>
+              </div>
             </div>
           </>
         )}

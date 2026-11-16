@@ -14,6 +14,8 @@ Ground rules for every phase:
 
 Accounts and vault, encrypted items and media, cultural locks, pause, map, releases with signatures, same-organisation messages, bridges, community management, governance log, Guide help mode, data export, Demo Country seed.
 
+Added on 17 October 2026: starting an organisation, making and removing administrators (at least one always kept), and bridges that need an administrator on each side to agree (request, accept or decline, withdraw, close), with every step in both governance logs.
+
 Added after the first review: changing who can open an item after it is saved, legacy access (keepers, never-to list, future recipients), two-signature Cultural Authority appointment with undo for roles and standings, governance log detail by access level, in-app notifications, chat lists split into people and groups with unread markers, bridges in their own tab, phone navigation with icons, confirm password on sign-up.
 
 Deployment setting to check on every new environment: Supabase → Authentication → URL Configuration. Site URL must be the app address and Redirect URLs must include `<app address>/**`, or email verification links fail.

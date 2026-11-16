@@ -5,10 +5,10 @@
 import type { IdentityKeys } from './crypto';
 import type { Directory } from './access';
 import type { MyOrg } from './data';
-import { conversationActivity, listConversations, loadReleases } from './data';
+import { conversationActivity, listBridges, listConversations, loadReleases } from './data';
 import { loadLegacy } from './legacy';
 
-export interface Note { id: string; kind: 'message' | 'member' | 'release' | 'ca' | 'legacy' | 'security'; text: string; href: string; at?: string }
+export interface Note { id: string; kind: 'message' | 'member' | 'release' | 'ca' | 'legacy' | 'security' | 'bridge'; text: string; href: string; at?: string }
 
 const readKey = (uid: string) => `vc-read-${uid}`;
 export function readMap(uid: string): Record<string, string> {
@@ -44,6 +44,13 @@ export async function loadNotifications(args: {
     for (const m of dir.members.filter((x) => x.status === 'pending')) {
       out.push({ id: `join-${m.user_id}`, kind: 'member', text: `${m.display_name} asked to join`, href: '/community' });
     }
+    try {
+      for (const b of await listBridges(org.id)) {
+        if (b.kind === 'request' && b.status === 'pending' && b.direction === 'incoming') {
+          out.push({ id: `bridge-${b.id}`, kind: 'bridge', text: `${b.other_org} asks to open a bridge with ${org.name}`, href: '/messages?tab=bridges', at: b.created_at });
+        }
+      }
+    } catch { /* bridges unavailable: skip */ }
   }
 
   if (isCa) {

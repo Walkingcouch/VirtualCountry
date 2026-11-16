@@ -1,7 +1,8 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { useSession } from '@/lib/session';
-import { issueAttestation, loadAudit, revokeAttestations, verifyChain, type AuditRow } from '@/lib/data';
+import Link from 'next/link';
+import { issueAttestation, loadAudit, revokeAttestations, setAdmin, verifyChain, type AuditRow } from '@/lib/data';
 import { supabase } from '@/lib/supabase';
 import type { Attestation } from '@/lib/model';
 
@@ -15,6 +16,8 @@ const ACTION_TEXT: Record<string, string> = {
   'legacy.wish_made': 'Legacy wish made', 'legacy.keeper_named': 'Legacy Keeper named', 'legacy.release_agreed': 'Keeper agreed to pass on knowledge',
   'legacy.release_withdrawn': 'Keeper withdrew agreement', 'legacy.received': 'Knowledge received through legacy', 'legacy.wish_revoked': 'Legacy wish cancelled',
   'legacy.wish_replaced': 'Legacy wish renewed', 'legacy.wish_fulfilled': 'Legacy wish completed',
+  'org.created': 'Organisation started', 'bridge.requested': 'Bridge requested', 'bridge.accepted': 'Bridge request accepted', 'bridge.declined': 'Bridge request declined',
+  'bridge.withdrawn': 'Bridge request withdrawn', 'bridge.active': 'Bridge opened',
 };
 const CLAIM_TEXT: Record<string, string> = {
   'standing:women': "women's standing", 'standing:men': "men's standing", 'role:cultural_authority': 'Cultural Authority', 'role:recovery_keeper': 'Recovery Keeper',
@@ -30,7 +33,7 @@ const DETAIL_LABEL: Record<string, string> = {
   signed_by: 'Signed by', removed_by: 'Removed by', originally_signed_by: 'Originally signed by', decided_by: 'Decided by', subject: 'Person', claim: 'What',
   added: 'Now can open', removed: 'Can no longer open', people_now: 'People who can open it', version: 'Version', from: 'From', to: 'To', status: 'Status',
   keeper: 'Keeper', received_by: 'Received by', keepers_needed: 'Keepers who must agree', title: 'Title', drafted_by: 'Drafted by', content_member: 'Receives content keys',
-  before: 'Before', after: 'After', issued_at: 'Signed at', item_version: 'Item version', wish: 'Legacy wish', item: 'Item',
+  before: 'Before', after: 'After', created_by: 'Started by', kind: 'Type', issued_at: 'Signed at', item_version: 'Item version', wish: 'Legacy wish', item: 'Item',
 };
 const isUuid = (v: unknown) => typeof v === 'string' && /^[0-9a-f-]{36}$/.test(v);
 
@@ -41,7 +44,7 @@ export default function Community() {
   const [settings, setSettings] = useState<{ ai_help: boolean; idle_lock_minutes: number } | null>(null);
   const [msg, setMsg] = useState('');
   const [open, setOpen] = useState<number | null>(null);
-  const [filter, setFilter] = useState<'all' | 'people' | 'items' | 'legacy' | 'releases'>('all');
+  const [filter, setFilter] = useState<'all' | 'people' | 'items' | 'legacy' | 'releases' | 'bridges'>('all');
   const isCa = cas.has(userId ?? '');
   const isAdmin = !!org?.is_admin;
   const seesDetail = isCa || isAdmin;
@@ -97,13 +100,15 @@ export default function Community() {
     || (filter === 'people' && (a.action.startsWith('member') || a.action.startsWith('attestation')))
     || (filter === 'items' && a.action.startsWith('item'))
     || (filter === 'legacy' && a.action.startsWith('legacy'))
-    || (filter === 'releases' && a.action.startsWith('release')));
+    || (filter === 'releases' && a.action.startsWith('release'))
+    || (filter === 'bridges' && (a.action.startsWith('bridge') || a.action.startsWith('org'))));
 
   return (
     <div className="space-y-8">
       <div>
         <div className="label mb-1">{org.kind === 'community' ? 'Community space' : 'Organisation'} · storage: {org.storage_option === 'cloud' ? 'Australian cloud (demo sandbox)' : org.storage_option} <span className="rule" /></div>
         <h1 className="font-head font-extrabold text-3xl break-words">{org.name.toUpperCase()}</h1>
+        <Link href="/organisations" className="text-sm underline text-mute">Your organisations: switch, join another or start a new one</Link>
       </div>
       {msg && <p className="card p-3 text-sm border-gold" role="status">{msg}</p>}
 
@@ -132,6 +137,12 @@ export default function Community() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {isAdmin && m.status === 'pending' && <button className="btn btn-gold !min-h-10" onClick={() => setStatus(m.user_id, 'active')}>Approve</button>}
+                  {isAdmin && m.status === 'active' && !m.is_admin && (
+                    <button className="btn btn-line !min-h-10" onClick={() => { if (confirm(`Make ${m.display_name.split(' (')[0]} an administrator of ${org.name}?\n\nAdministrators approve and remove members, run bridges to other organisations and change settings. They cannot see anyone's stories.`)) run(() => setAdmin(org.id, m.user_id, true), `${m.display_name.split(' (')[0]} is now an administrator. This is recorded in the governance log.`); }}>Make administrator</button>
+                  )}
+                  {isAdmin && m.status === 'active' && m.is_admin && (
+                    <button className="btn btn-line !min-h-10" onClick={() => { if (confirm(me ? `Stop being an administrator of ${org.name}? Another administrator will need to make you one again.` : `Remove the administrator role from ${m.display_name.split(' (')[0]}?`)) run(() => setAdmin(org.id, m.user_id, false), me ? 'You are no longer an administrator.' : 'Administrator role removed. This is recorded in the governance log.'); }}>{me ? 'Step down as administrator' : 'Remove administrator'}</button>
+                  )}
                   {isAdmin && m.status === 'active' && !me && <button className="btn btn-danger !min-h-10" onClick={() => { if (confirm(`Remove ${m.display_name} from ${org.name}?`)) setStatus(m.user_id, 'removed'); }}>Remove</button>}
                   {isCa && m.status === 'active' && m.content_member && (
                     <>
@@ -157,7 +168,7 @@ export default function Community() {
             );
           })}
         </div>
-        <p className="text-xs text-mute mt-2">Standings and roles are confirmed by Cultural Authorities with a digital signature, and can be undone. A new Cultural Authority needs two Cultural Authorities to agree (while there is only one, they can appoint the second). Administrators cannot confirm standings, and cannot give themselves keys.</p>
+        <p className="text-xs text-mute mt-2">Standings and roles are confirmed by Cultural Authorities with a digital signature, and can be undone. A new Cultural Authority needs two Cultural Authorities to agree (while there is only one, they can appoint the second). Administrators cannot confirm standings, and cannot give themselves keys. An administrator can make another member an administrator; every organisation always keeps at least one.</p>
       </section>
 
       {isAdmin && settings && (
@@ -182,7 +193,7 @@ export default function Community() {
           {seesDetail ? ' As an administrator or Cultural Authority you can open each entry for full detail: who signed, who was added or removed, and what changed.' : ' Administrators and Cultural Authorities can open each entry for more detail.'}
         </p>
         <div className="flex flex-wrap gap-1 mb-3" role="tablist">
-          {(['all', 'people', 'items', 'legacy', 'releases'] as const).map((f) => (
+          {(['all', 'people', 'items', 'legacy', 'releases', 'bridges'] as const).map((f) => (
             <button key={f} onClick={() => setFilter(f)} className={`chip !py-1.5 !px-3 ${filter === f ? '!bg-ink !text-white' : ''}`}>{f === 'all' ? 'Everything' : f[0].toUpperCase() + f.slice(1)}</button>
           ))}
         </div>

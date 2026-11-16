@@ -4,9 +4,9 @@ import { useNotes } from '@/lib/notes-context';
 import type { Note } from '@/lib/notifications';
 
 const GROUP: Record<Note['kind'], string> = {
-  security: 'Needs your attention', legacy: 'Legacy', ca: 'Cultural Authority', release: 'Public summaries', member: 'People', message: 'Messages',
+  security: 'Needs your attention', bridge: 'Bridges', legacy: 'Legacy', ca: 'Cultural Authority', release: 'Public summaries', member: 'People', message: 'Messages',
 };
-const ORDER: Note['kind'][] = ['security', 'legacy', 'ca', 'release', 'member', 'message'];
+const ORDER: Note['kind'][] = ['security', 'bridge', 'legacy', 'ca', 'release', 'member', 'message'];
 
 export default function Notifications() {
   const { notes, reload } = useNotes();

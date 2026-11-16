@@ -86,11 +86,14 @@ All accounts use password `VirtualCountry-demo-2026` and unlock passphrase `coun
 13. Sign in as each keeper and open **Legacy**. Each keeper sees the wishes, the never list and the message, ticks that the wishes are met and chooses Daniel and taps **Agree and pass on my part**. Anyone on a never list is left out of the choices. When the second keeper agrees, Daniel opens **Legacy** and taps **Receive it**. The item now opens for them. Every step is in the governance log.
 14. As **Rose**, open **Community**. Daniel shows as put forward as a Cultural Authority and waiting for a second Cultural Authority (Rose's signature is already in the sandbox). Sign in as **Tom**, who sees it in **Notifications**, and either agrees or withdraws the nomination. Standings and roles can be undone from the same screen.
 
+15. **Administrators and organisations.** As **Sam**, open **Community** and press **Make administrator** on a member. Every organisation keeps at least one administrator, so the last one cannot step down. Open **More → Organisations** to switch between your organisations, ask to join another, or start a new one (you become its first administrator).
+16. **Bridges.** As an administrator, open **Messages → Bridges → Ask for a bridge** and choose another organisation. An administrator of that organisation sees the request under Bridges and in Notifications, and presses **Accept**. Their device makes the bridge key and seals it to the administrators of both organisations. Every member of both organisations can see the bridge exists and when it is used. Either side can **Close bridge**; after that nobody can post.
+
 ## Project layout
 
 ```
 app/                  Next.js App Router pages
-  (root)              home, record, stories, map, messages, releases, community, legacy, notifications, me
+  (root)              home, record, stories, map, messages, releases, community, legacy, notifications, organisations, me
   login, setup, public
 components/           map, Guide, unlock screen, logo, chips
 lib/

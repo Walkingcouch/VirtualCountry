@@ -296,11 +296,70 @@ export async function membersOf(convIds: string[]): Promise<Map<string, string[]
   return out;
 }
 
-export interface BridgeInfo { bridge_id: string; other_org: string; participants: string[]; message_count: number; last_message_at: string | null; status: string; created_at: string }
+export interface BridgeInfo {
+  id: string; kind: 'bridge' | 'request'; other_org: string; direction: 'incoming' | 'outgoing'; conversation_id: string | null;
+  requested_by: string | null; participants: string[]; message_count: number; last_message_at: string | null; status: string; created_at: string;
+}
+/** Bridges and bridge requests for an organisation. Every member sees that they exist and when they are used, never what they say. */
 export async function listBridges(orgId: string): Promise<BridgeInfo[]> {
-  const { data, error } = await supabase().rpc('list_bridges', { p_org: orgId });
+  const { data, error } = await supabase().rpc('list_bridges_v2', { p_org: orgId });
   if (error) throw error;
   return (data ?? []) as BridgeInfo[];
+}
+/** Administrator asks another organisation for a bridge. Their administrator must accept. */
+export async function requestBridge(myOrg: string, otherOrg: string) {
+  const { error } = await supabase().rpc('request_bridge', { p_my_org: myOrg, p_other_org: otherOrg });
+  if (error) throw error;
+}
+export async function bridgeAction(id: string, action: 'decline' | 'withdraw' | 'close') {
+  const { error } = await supabase().rpc('bridge_action', { p_id: id, p_action: action });
+  if (error) throw error;
+}
+/** Accept a bridge request. The database opens the bridge chat with the administrators of both organisations;
+ *  this device makes the chat key and seals it to each of them, so the server never holds it. */
+export async function acceptBridge(requestId: string, me: c.IdentityKeys, myId: string): Promise<string> {
+  const sb = supabase();
+  const { data: conv, error } = await sb.rpc('bridge_action', { p_id: requestId, p_action: 'accept' });
+  if (error) throw error;
+  const convId = conv as string;
+  const m = await sb.from('conversation_members').select('user_id').eq('conversation_id', convId);
+  if (m.error) throw m.error;
+  const ids = (m.data ?? []).map((r) => r.user_id as string);
+  const pk = await sb.from('public_keys').select('user_id, enc_pk').in('user_id', ids);
+  if (pk.error) throw pk.error;
+  const key = await c.randomKey();
+  const rows = [];
+  for (const r of pk.data ?? []) rows.push({ conversation_id: convId, key_version: 1, recipient_id: r.user_id, sealed_key: await c.seal(key, r.user_id === myId ? me.encPk : r.enc_pk) });
+  const ins = await sb.from('conversation_keys').insert(rows);
+  if (ins.error) throw ins.error;
+  return convId;
+}
+/** Names (and organisation) of the people on bridges I am on. */
+export async function bridgePeople(): Promise<Map<string, { name: string; org: string }>> {
+  const { data, error } = await supabase().rpc('bridge_people');
+  if (error) throw error;
+  const out = new Map<string, { name: string; org: string }>();
+  for (const r of (data ?? []) as { user_id: string; display_name: string; org_name: string }[]) out.set(r.user_id, { name: r.display_name, org: r.org_name });
+  return out;
+}
+
+/* =========================================================
+   Organisations and administrators
+   ========================================================= */
+/** Start a new organisation. The person who starts it is its first administrator (and, for a community, its founding Cultural Authority). */
+export async function createOrg(name: string, kind: 'community' | 'partner'): Promise<string> {
+  const { data, error } = await supabase().rpc('create_org', { p_name: name, p_kind: kind });
+  if (error) throw error;
+  return data as string;
+}
+export async function askToJoin(orgId: string, userId: string) {
+  const { error } = await supabase().from('org_members').insert({ org_id: orgId, user_id: userId, status: 'pending' });
+  if (error) throw error;
+}
+/** Administrators only. Every organisation keeps at least one administrator (enforced by the database). */
+export async function setAdmin(orgId: string, userId: string, value: boolean) {
+  const { error } = await supabase().from('org_members').update({ is_admin: value }).eq('org_id', orgId).eq('user_id', userId);
+  if (error) throw error;
 }
 
 /* =========================================================

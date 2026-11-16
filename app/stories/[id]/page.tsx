@@ -12,6 +12,7 @@ import AccessPicker, { accessFromPayload, applyAccess, type AccessValue } from '
 import LegacyForm from '@/components/LegacyForm';
 import { describeWhen, loadLegacy, refreshWish, type LegacyView } from '@/lib/legacy';
 import { describeAccess } from '@/lib/access';
+import { supabase } from '@/lib/supabase';
 
 export default function Story() {
   const { id } = useParams<{ id: string }>();
@@ -20,6 +21,17 @@ export default function Story() {
   const it = items.find((x) => x.row.id === id);
   const [accepted, setAccepted] = useState(false);
   const [showServer, setShowServer] = useState(false);
+  const [stored, setStored] = useState<{ row: Record<string, unknown> | null; keys: { recipient_id: string; sealed_key: string }[]; err: string } | null>(null);
+  /** Fetch the item exactly as the database holds it, so people can see it is encrypted. */
+  const loadStored = useCallback(async (itemId: string, version: number) => {
+    setStored(null);
+    const sb = supabase();
+    const [v, k] = await Promise.all([
+      sb.from('item_versions').select('item_id, version, nonce, ciphertext, author_id, author_sig, created_at').eq('item_id', itemId).eq('version', version).maybeSingle(),
+      sb.from('item_keys').select('recipient_id, sealed_key').eq('item_id', itemId).eq('version', version),
+    ]);
+    setStored({ row: v.data ?? null, keys: k.data ?? [], err: v.error?.message ?? k.error?.message ?? '' });
+  }, []);
   const [media, setMedia] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState('');
   const [msg, setMsg] = useState('');
@@ -149,13 +161,26 @@ export default function Story() {
         )}
 
         <div className="card p-5 mt-5">
-          <button className="flex w-full items-center justify-between" onClick={() => setShowServer(!showServer)}>
-            <span className="font-head font-semibold">What the server sees</span><span>{showServer ? '−' : '+'}</span>
+          <button className="flex w-full items-center justify-between text-left gap-3" onClick={() => { const next = !showServer; setShowServer(next); if (next) loadStored(it.row.id, it.version); }} aria-expanded={showServer}>
+            <span className="font-head font-semibold">Proof it is encrypted: the record as the database stores it</span><span>{showServer ? '−' : '+'}</span>
           </button>
           {showServer && (
-            <div className="mt-3 text-sm space-y-2">
-              <p className="text-mute">This is everything the database holds for this item. It cannot read the story, the place, the consent or the restrictions.</p>
-              <pre className="bg-ink text-[#9FD9DE] p-3 rounded text-xs whitespace-pre-wrap break-all">{JSON.stringify({ id: it.row.id, holder_id: it.row.holder_id, version: it.version, paused: it.row.paused, sacred: it.row.sacred, recipients: it.recipients.length + ' sealed keys', ciphertext: it.ciphertextPreview + '…' }, null, 2)}</pre>
+            <div className="mt-3 text-sm space-y-3">
+              <ol className="list-decimal pl-5 space-y-1 text-mute">
+                <li>Your device made a new key for this item and encrypted it (XChaCha20-Poly1305) before it was uploaded.</li>
+                <li>That key was then locked separately for each person allowed to open it, using their public key. Only their own device can unlock it.</li>
+                <li>The database, the administrators and First Geospatial hold only the scrambled text and the locked keys below. None of them can read the story, the place, the consent or the restrictions.</li>
+              </ol>
+              <p className="text-mute">Fetched from the database just now. This is the actual stored record, not a summary:</p>
+              {!stored ? <p className="text-mute">Fetching…</p> : stored.err ? <p className="text-danger">{stored.err}</p> : (
+                <pre className="bg-ink text-[#9FD9DE] p-3 rounded text-xs whitespace-pre-wrap break-all">{JSON.stringify({
+                  table: 'item_versions',
+                  ...stored.row,
+                  ciphertext: typeof stored.row?.ciphertext === 'string' ? `${(stored.row.ciphertext as string).slice(0, 240)}… (${(stored.row.ciphertext as string).length} characters in total)` : stored.row?.ciphertext,
+                  item_keys: stored.keys.map((k) => ({ recipient_id: k.recipient_id, sealed_key: `${k.sealed_key.slice(0, 32)}…` })),
+                }, null, 2)}</pre>
+              )}
+              <p className="text-xs text-mute">The only words the database can read are things like the item&apos;s id, its version number, whether it is paused, and who holds a locked key. Published public summaries are the exception: they are readable on purpose, after a Cultural Authority signs them.</p>
             </div>
           )}
         </div>
