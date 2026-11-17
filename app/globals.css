@@ -5,7 +5,7 @@
   --color-ink: #10151B;
   --color-deep: #07141A;
   --color-gold: #DDA66A;
-  --color-gold-text: #A8733A;
+  --color-gold-text: #8A5A24;
   --color-teal: #2FB5C0;
   --color-paper: #FAF7F2;
   --color-sand: #F3EBDD;
@@ -13,7 +13,7 @@
   --color-text: #1E2329;
   --color-mute: #5B6570;
   --color-danger: #B3261E;
-  --color-ok: #2E7D4F;
+  --color-ok: #256B42;
   --font-head: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
   --font-body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
 }
@@ -57,3 +57,13 @@ body { font-family: var(--font-body); font-size: 17px; line-height: 1.55; -webki
 :focus-visible { outline: 3px solid var(--color-gold); outline-offset: 2px; }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* Accessibility (WCAG 2.2 AA): chips used as buttons keep a touch target of at least 32px. */
+button.chip { min-height: 32px; padding-inline: .7rem; cursor: pointer; }
+button:disabled, .btn[disabled] { cursor: not-allowed; }
+
+/* Policy pages */
+.legal h2 { font-family: var(--font-head); font-weight: 600; font-size: 1.15rem; margin-top: 1.5rem; }
+.legal ul { list-style: disc; padding-left: 1.25rem; }
+.legal li { margin: .25rem 0; }
+.legal a { text-decoration: underline; }

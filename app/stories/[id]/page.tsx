@@ -1,10 +1,11 @@
 'use client';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { useSession } from '@/lib/session';
 import { useItems } from '@/lib/items-context';
-import { blurPoint, draftRelease, openMedia, saveItemVersion } from '@/lib/data';
+import { blurPoint, deleteItem, draftRelease, openMedia, saveItemVersion } from '@/lib/data';
+import { friendly } from '@/lib/errors';
 import { TK_LABELS, USE_LABELS, type UseKey } from '@/lib/model';
 import ItemChips from '@/components/ItemChips';
 import DemoMap from '@/components/DemoMap';
@@ -16,6 +17,8 @@ import { supabase } from '@/lib/supabase';
 
 export default function Story() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const { userId, keys, org, dir, nameOf } = useSession();
   const { items, loading, reload } = useItems();
   const it = items.find((x) => x.row.id === id);
@@ -81,7 +84,7 @@ export default function Story() {
       const n = await refreshLegacy(it.version + 1);
       await reload();
       setMsg((paused ? 'Paused. Re-locked under a new key that only you hold. Everyone else has lost access.' : `Pause lifted. Re-locked for ${r.length} people.`) + (n ? ' Your legacy wishes were renewed for the new key.' : ''));
-    } catch (e) { setMsg((e as Error).message); } finally { setBusy(''); }
+    } catch (e) { setMsg(friendly(e)); } finally { setBusy(''); }
   };
 
   const saveAccess = async () => {
@@ -97,7 +100,7 @@ export default function Story() {
       await reload();
       setEditAccess(null);
       setMsg(`Saved and locked again with a new key. ${r.length} ${r.length === 1 ? 'person' : 'people'} can open it.${added.length ? ` Added: ${added.join(', ')}.` : ''}${removed.length ? ` Removed: ${removed.join(', ')}.` : ''}${n ? ' Legacy wishes renewed.' : ''} The change is in the governance log.`);
-    } catch (e) { setMsg((e as Error).message); } finally { setBusy(''); }
+    } catch (e) { setMsg(friendly(e)); } finally { setBusy(''); }
   };
 
   const submitRelease = async () => {
@@ -107,7 +110,23 @@ export default function Story() {
       await draftRelease({ orgId: org.id, itemId: it.row.id, title: rel.title, summary: rel.summary, placeLabel: p.place ? `${p.place.label.replace(/^Near /, '').replace(' (demo)', '')} area (location generalised)` : 'Location not shared', bx: blur?.bx ?? null, by: blur?.by ?? null, labels: p.labels.filter((l) => !['tk-women', 'tk-men'].includes(l)), myId: userId });
       setRel(null);
       setMsg('Sent for Cultural Authority sign-off. It will appear publicly only after it is signed.');
-    } catch (e) { setMsg((e as Error).message); } finally { setBusy(''); }
+    } catch (e) { setMsg(friendly(e)); } finally { setBusy(''); }
+  };
+
+  const unlockMedia = async (m: (typeof p.media)[number]) => {
+    setBusy(`media-${m.id}`); setMsg('');
+    try { const url = await openMedia(m); setMedia((old) => ({ ...old, [m.id]: url })); }
+    catch (e) { setMsg(`${m.name} could not be opened. ${friendly(e)}`); }
+    finally { setBusy(''); }
+  };
+
+  const remove = async () => {
+    setBusy('delete'); setMsg('');
+    try {
+      await deleteItem(it.row.id, p.media);
+      await reload();
+      router.replace('/stories');
+    } catch (e) { setMsg(friendly(e)); setBusy(''); }
   };
 
   const download = () => {
@@ -141,7 +160,7 @@ export default function Story() {
                 {p.media.map((m) => (
                   <div key={m.id}>
                     {!media[m.id] ? (
-                      <button className="btn btn-line" onClick={async () => setMedia({ ...media, [m.id]: await openMedia(m) })}>Unlock {m.name}</button>
+                      <button className="btn btn-line" disabled={busy === `media-${m.id}`} onClick={() => unlockMedia(m)}>{busy === `media-${m.id}` ? 'Unlocking…' : `Unlock ${m.name}`}</button>
                     ) : m.mime.startsWith('audio') ? <audio controls src={media[m.id]} className="w-full" />
                       : m.mime.startsWith('image') ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={media[m.id]} alt={m.name} className="max-w-full rounded" />
                       : m.mime.startsWith('video') ? <video controls src={media[m.id]} className="w-full" />
@@ -257,6 +276,17 @@ export default function Story() {
             {canRelease && !rel && <button className="btn btn-gold w-full" onClick={() => setRel({ title: p.title, summary: '' })}>Prepare public summary</button>}
             {!canRelease && <p className="text-xs text-mute">Public summaries need consent for public use, and are never possible for paused, sacred, women&apos;s or men&apos;s items.</p>}
             <button className="btn btn-line w-full" onClick={download}>Download (decrypted, to this device)</button>
+            {!confirmDelete ? (
+              <button className="btn btn-line w-full !text-danger" onClick={() => setConfirmDelete(true)}>Delete this item</button>
+            ) : (
+              <div className="border border-danger rounded p-3 text-sm" role="alertdialog" aria-label="Confirm delete">
+                <p className="mb-2"><strong>Delete this item for good?</strong> The stored text, files and every key are erased for everyone. Legacy wishes for it are cancelled. Only the log entry that it existed stays. This cannot be undone. Download a copy first if you want to keep one.</p>
+                <div className="flex gap-2">
+                  <button className="btn btn-danger flex-1" onClick={remove} disabled={busy === 'delete'}>{busy === 'delete' ? 'Deleting…' : 'Yes, delete it'}</button>
+                  <button className="btn btn-line" onClick={() => setConfirmDelete(false)}>Keep it</button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

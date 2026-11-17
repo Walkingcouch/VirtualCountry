@@ -4,6 +4,7 @@ import { useSession } from '@/lib/session';
 import { DEMO_MODE, DEMO_PASSPHRASE } from '@/lib/supabase';
 import { rewrapPassphrase, unlockWithPassphrase, unlockWithRecoveryCode } from '@/lib/vault';
 import Logo from './Logo';
+import { checkPassphrase } from '@/lib/passphrase';
 
 export default function Unlock() {
   const { vault, setKeys, displayName, signOut, userId } = useSession();
@@ -21,13 +22,14 @@ export default function Unlock() {
       if (mode === 'pass') {
         setKeys(await unlockWithPassphrase(vault, pass));
       } else {
-        if (newPass.length < 8) throw new Error('short');
+        const check = checkPassphrase(newPass, [displayName]);
+        if (!check.ok) throw new Error(`short:${check.hint}`);
         const { keys, amk } = await unlockWithRecoveryCode(vault, code);
         await rewrapPassphrase(userId!, amk, newPass);
         setKeys(keys);
       }
     } catch (e) {
-      setErr(mode === 'pass' ? 'That passphrase did not work. Check it and try again.' : (e as Error).message === 'short' ? 'Choose a new passphrase of at least 8 characters.' : 'That recovery code did not work.');
+      setErr(mode === 'pass' ? 'That passphrase did not work. Check it and try again.' : (e as Error).message.startsWith('short:') ? (e as Error).message.slice(6) : typeof navigator !== 'undefined' && !navigator.onLine ? 'You are offline. Connect and try again.' : 'That recovery code did not work.');
     } finally { setBusy(false); }
   };
 
@@ -51,15 +53,15 @@ export default function Unlock() {
               <input className="input !text-text" type="password" value={newPass} onChange={(e) => setNewPass(e.target.value)} placeholder="Choose a new passphrase" aria-label="New passphrase" />
             </>
           )}
-          {err && <p className="text-[#F3B0A8] text-sm">{err}</p>}
+          {err && <p className="text-[#F3B0A8] text-sm" role="alert">{err}</p>}
           <button className="btn btn-gold w-full" disabled={busy}>{busy ? 'Opening…' : 'Open'}</button>
         </form>
-        {DEMO_MODE && mode === 'pass' && <p className="text-white/50 text-xs mt-3">Demo passphrase: {DEMO_PASSPHRASE}</p>}
+        {process.env.NEXT_PUBLIC_DEMO_MODE === 'true' && mode === 'pass' && <p className="text-white/50 text-xs mt-3">Demo passphrase: {DEMO_PASSPHRASE}</p>}
         <div className="flex justify-between mt-6 text-sm">
           <button className="underline text-white/70" onClick={() => setMode(mode === 'pass' ? 'recovery' : 'pass')}>{mode === 'pass' ? 'Forgot it? Use my recovery card' : 'Use my passphrase'}</button>
           <a className="underline text-white/70" href="/public">Public page</a>
         </div>
-        <p className="text-white/50 text-xs mt-6">Lost your passphrase and recovery card? Ask your Community Administrator for in-person recovery with two Recovery Keepers.</p>
+        <p className="text-white/65 text-xs mt-6">Lost both your passphrase and your recovery card? Nobody can open your things for you, including First Geospatial. In-person recovery with Recovery Keepers is planned but not available yet. For help with anything else, email contact@firstgeospatial.com.au.</p>
       </div>
     </main>
   );

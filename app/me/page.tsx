@@ -4,12 +4,13 @@ import { useSession } from '@/lib/session';
 import { useItems } from '@/lib/items-context';
 import { safetyCode } from '@/lib/crypto';
 import Icon from '@/components/Icon';
+import AccountSecurity from '@/components/AccountSecurity';
 
 export default function Me() {
   const { keys, displayName, email, signOut, lock, nameOf, org, cas, standing, userId } = useSession();
   const { items } = useItems();
   const [code, setCode] = useState('');
-  useEffect(() => { if (keys) safetyCode(keys.signPk, keys.encPk).then(setCode); }, [keys]);
+  useEffect(() => { if (keys) safetyCode(keys.signPk, keys.encPk).then(setCode).catch(() => setCode('')); }, [keys]);
   const mine = standing.get(userId ?? '') ?? new Set<string>();
   const [name, role] = [displayName.split(' (')[0], displayName.match(/\(([^)]+)\)/)?.[1]];
 
@@ -45,6 +46,8 @@ export default function Me() {
         </div>
       </div>
 
+      <AccountSecurity />
+
       <div className="card p-5">
         <h2 className="font-head font-semibold mb-1">Safety code</h2>
         <p className="text-sm text-mute mb-3">Six words made from your security key. Compare them face to face with another member. If the words match what they see for you, nobody has swapped your key.</p>
@@ -62,7 +65,7 @@ export default function Me() {
         <ul className="text-sm space-y-1 list-disc pl-5">
           <li>Forgot your passphrase: use your printed recovery card on the unlock screen.</li>
           <li>New phone: sign in, then open with your passphrase or recovery card.</li>
-          <li>Lost everything: ask your Community Administrator for in-person recovery. Two Recovery Keepers confirm who you are face to face. Nobody can read your stories at any point.</li>
+          <li>Lost both: there is no way back in yet. In-person recovery with Recovery Keepers is planned but not built. Until it is, keep your recovery card somewhere safe and make a new one below if you lose it.</li>
         </ul>
         <p className="text-sm text-mute mt-3">Help from First Geospatial: <a className="underline" href="mailto:contact@firstgeospatial.com.au">contact@firstgeospatial.com.au</a>. We can help with access problems, but we can never open your stories.</p>
       </div>

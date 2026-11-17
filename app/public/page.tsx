@@ -1,4 +1,5 @@
 'use client';
+import { friendly } from '@/lib/errors';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { loadPublicReleases, verifyRelease, type Release } from '@/lib/data';
@@ -14,7 +15,7 @@ export default function PublicReleases() {
   useEffect(() => {
     loadPublicReleases()
       .then(async (r) => setRows(await Promise.all(r.map(async (x) => ({ ...x, ok: await verifyRelease(x, x.signer_pk) })))))
-      .catch((e) => setErr(e.message));
+      .catch((e) => setErr(friendly(e)));
   }, []);
   return (
     <main className="min-h-screen bg-paper">

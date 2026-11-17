@@ -15,7 +15,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const itemVersions = useMemo(() => new Map(items.map((i) => [i.row.id, i.row.current_version])), [items]);
 
   const reload = useCallback(async () => {
-    if (!org || !dir || !userId || !keys) { setNotes([]); return; }
+    if (!org || !dir || !userId || !keys || dir.orgId !== org.id) { setNotes([]); return; }
     try {
       setNotes(await loadNotifications({ org, dir, userId, keys, cas, caPending, keyAlerts, openItemIds, itemVersions, nameOf }));
     } catch { /* keep the last list if a refresh fails */ }

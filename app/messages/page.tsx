@@ -1,7 +1,8 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from '@/lib/session';
-import { acceptBridge, allOrgs, bridgeAction, bridgePeople, conversationActivity, createConversation, listBridges, listConversations, loadMessages, membersOf, requestBridge, sendMessage, type BridgeInfo, type ChatMessage, type Conversation } from '@/lib/data';
+import { acceptBridge, allOrgs, bridgeAction, bridgePeople, conversationActivity, createConversation, listBridges, listConversations, loadMessages, membersOf, requestBridge, sendMessage, type BridgeInfo, type ChatMessage, type Conversation, shareMissingKeys } from '@/lib/data';
+import { friendly } from '@/lib/errors';
 import { markRead, readMap } from '@/lib/notifications';
 import { supabase } from '@/lib/supabase';
 
@@ -68,6 +69,8 @@ export default function Messages() {
     atBottom.current = true;
     const list = await loadMessages(c, keys, userId, signKeys);
     setMsgs(list);
+    // Pass the chat key to anyone who joined after it was made, such as a new administrator on a bridge.
+    shareMissingKeys(c, keys, userId).catch(() => undefined);
     markRead(userId, c.id, list.at(-1)?.created_at ?? new Date().toISOString());
     setRead(readMap(userId));
   }, [keys, userId, signKeys]);
@@ -80,7 +83,7 @@ export default function Messages() {
       const id = qs.get('c');
       const target = id ? c.find((x) => x.id === id) : null;
       if (target) { setTab(target.kind === 'bridge' ? 'bridges' : 'chats'); open(target); }
-    }).catch((e) => setErr(e.message));
+    }).catch((e) => setErr(friendly(e)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refresh]);
 
@@ -122,7 +125,7 @@ export default function Messages() {
       atBottom.current = true;
       await open(active);
       await refresh();
-    } catch (e) { setErr((e as Error).message); }
+    } catch (e) { setErr(friendly(e)); }
   };
 
   const people = useMemo(() => (dir?.members ?? []).filter((m) => m.status === 'active' && m.user_id !== userId), [dir, userId]);
@@ -152,7 +155,7 @@ export default function Messages() {
 
   const doBridge = async (key: string, fn: () => Promise<unknown>, ok: string) => {
     setBridgeBusy(key); setBridgeMsg('');
-    try { await fn(); setBridgeMsg(ok); await refresh(); } catch (e) { setBridgeMsg((e as Error).message); } finally { setBridgeBusy(''); }
+    try { await fn(); setBridgeMsg(ok); await refresh(); } catch (e) { setBridgeMsg(friendly(e)); } finally { setBridgeBusy(''); }
   };
   const unreadChats = [...direct, ...groups].filter(isUnread).length;
   const unreadBridges = bridgeConvs.filter(isUnread).length;
@@ -171,7 +174,7 @@ export default function Messages() {
       const c = await refresh();
       const made = c.find((x) => x.id === id);
       if (made) await open(made);
-    } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
+    } catch (e) { setErr(friendly(e)); } finally { setBusy(false); }
   };
 
   // Demonstrates the same-organisation rule: the database refuses a chat with someone outside the organisation.

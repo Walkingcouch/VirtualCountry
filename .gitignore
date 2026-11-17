@@ -7,3 +7,5 @@ scripts/.demo-secrets.json
 
 .vercel
 .env*
+test-results
+playwright-report

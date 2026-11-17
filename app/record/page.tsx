@@ -6,6 +6,7 @@ import { useItems } from '@/lib/items-context';
 import { saveItemVersion, uploadMedia } from '@/lib/data';
 import { TK_LABELS, USE_LABELS, type ItemPayload, type MediaRef, type UseAnswer, type UseKey } from '@/lib/model';
 import AccessPicker, { type AccessValue } from '@/components/AccessPicker';
+import { friendly } from '@/lib/errors';
 import DemoMap, { DEMO_PLACES } from '@/components/DemoMap';
 
 const USES = Object.keys(USE_LABELS) as UseKey[];
@@ -68,7 +69,7 @@ export default function Record() {
       await reload();
       router.push(`/stories/${itemId}`);
     } catch (e) {
-      setErr((e as Error).message);
+      setErr(friendly(e));
     } finally { setBusy(false); }
   };
 
@@ -111,7 +112,7 @@ export default function Record() {
               <option value="written">Written</option>
               <option value="witnessed">Witnessed by another member</option>
             </select>
-            {method === 'witnessed' && <input className="input" value={witness} onChange={(e) => setWitness(e.target.value)} placeholder="Witness name" />}
+            {method === 'witnessed' && <input className="input" value={witness} onChange={(e) => setWitness(e.target.value)} placeholder="Witness name" aria-label="Witness name" />}
           </div>
           <div className="divide-y divide-line">
             {USES.map((u) => (

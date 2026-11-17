@@ -9,6 +9,7 @@ import { supabase } from './supabase';
 import { fetchVault, type VaultRow } from './vault';
 import { loadDirectory, myOrgs, type MyOrg } from './data';
 import { caState, standings, type Directory } from './access';
+import { friendly } from './errors';
 
 type Status = 'loading' | 'signed_out' | 'needs_setup' | 'locked' | 'ready';
 
@@ -27,6 +28,8 @@ interface SessionValue {
   standing: Map<string, Set<string>>;
   keyAlerts: string[];
   idleMinutes: number;
+  /** Set when the community could not be loaded, so the screen can say so and offer a retry. */
+  loadError: string;
   setKeys: (k: IdentityKeys) => void;
   setOrgId: (id: string) => void;
   refresh: () => Promise<void>;
@@ -65,6 +68,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [standing, setStanding] = useState<Map<string, Set<string>>>(new Map());
   const [keyAlerts, setKeyAlerts] = useState<string[]>([]);
   const [idleMinutes, setIdleMinutes] = useState(10);
+  const [loadError, setLoadError] = useState('');
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadUser = useCallback(async () => {
@@ -87,10 +91,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    loadUser().catch(() => setStatus('signed_out'));
+    const fail = (e: unknown) => { setLoadError(friendly(e)); setStatus((s) => (s === 'loading' ? 'signed_out' : s)); };
+    loadUser().catch(fail);
     const { data: sub } = supabase().auth.onAuthStateChange((event) => {
       if (event === 'SIGNED_OUT') { setKeysState(null); setDir(null); setOrgs([]); setOrgId(null); setStatus('signed_out'); }
-      if (event === 'SIGNED_IN') loadUser();
+      if (event === 'SIGNED_IN') loadUser().catch(fail);
     });
     return () => sub.subscription.unsubscribe();
   }, [loadUser]);
@@ -99,6 +104,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     if (!userId) return;
+    setLoadError('');
     const o = await myOrgs(userId);
     setOrgs(o);
     const current = o.find((x) => x.id === orgId);
@@ -125,7 +131,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [userId, orgId]);
 
   useEffect(() => {
-    if (status === 'ready' && orgId) refresh().catch(console.error);
+    if (status === 'ready' && orgId) refresh().catch((e) => setLoadError(friendly(e)));
     if (orgId) try { localStorage.setItem('vc-org', orgId); } catch { /* ignore */ }
   }, [status, orgId, refresh]);
 
@@ -156,7 +162,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [dir, userId, displayName]);
 
   const value: SessionValue = {
-    status, userId, email, displayName, vault, keys, orgs, org, dir, cas, caPending, standing, keyAlerts, idleMinutes,
+    status, userId, email, displayName, vault, keys, orgs, org, dir, cas, caPending, standing, keyAlerts, idleMinutes, loadError,
     setKeys, setOrgId: (id) => setOrgId(id), refresh: async () => { await loadUser(); await refresh(); }, lock, signOut, nameOf,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

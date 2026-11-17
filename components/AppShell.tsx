@@ -44,12 +44,32 @@ function areaOf(path: string): Area {
   return (['record', 'stories', 'map', 'messages', 'releases', 'community', 'me', 'legacy', 'notifications'] as Area[]).includes(seg) ? seg : 'general';
 }
 
+/** True while the browser reports a connection. */
+function useOnline() {
+  const [online, setOnline] = useState(true);
+  useEffect(() => {
+    const sync = () => setOnline(navigator.onLine);
+    sync();
+    window.addEventListener('online', sync);
+    window.addEventListener('offline', sync);
+    return () => { window.removeEventListener('online', sync); window.removeEventListener('offline', sync); };
+  }, []);
+  return online;
+}
+
+/** Screens that still make sense before a person belongs to a community. */
+const NO_ORG_PAGES = ['/', '/organisations', '/me', '/notifications', '/privacy', '/terms', '/icip', '/contact'];
+
+const PUBLIC_PAGES = ['/login', '/setup', '/public', '/privacy', '/terms', '/icip', '/contact'];
+
 const isActive = (path: string, href: string) => (href === '/' ? path === '/' : path === href || path.startsWith(href + '/'));
 
 function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
-  const { org, orgs, setOrgId, lock, keyAlerts, displayName } = useSession();
-  const { deny } = useItems();
+  const { org, orgs, setOrgId, lock, keyAlerts, displayName, loadError, refresh } = useSession();
+  const { deny, error: itemsError, reload } = useItems();
+  const online = useOnline();
+  const problem = loadError || itemsError;
   const { notes } = useNotes();
   const [more, setMore] = useState(false);
   const active = orgs.filter((o) => o.status === 'active');
@@ -60,6 +80,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-10">
+      <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[60] focus:bg-gold focus:text-ink focus:px-3 focus:py-2 focus:rounded">Skip to content</a>
       <header className="bg-ink text-white sticky top-0 z-30">
         <div className="max-w-6xl mx-auto px-4 h-[72px] flex items-center gap-3 lg:gap-4">
           <Link href="/" aria-label="Home" className="shrink-0"><Logo variant="compact" className="h-9 sm:h-12" /></Link>
@@ -102,7 +123,34 @@ function Shell({ children }: { children: React.ReactNode }) {
           Security key changed for {keyAlerts.join(', ')}. This is normal if they have a new phone. Check with them if you are not sure.
         </div>
       )}
-      <main className="max-w-6xl mx-auto px-4 py-6">{children}</main>
+      {!online && (
+        <div className="bg-ink text-white text-sm px-4 py-2 text-center border-b border-gold" role="status">
+          You are offline. You can read what is already open. Nothing can be saved or sent until the connection is back.
+        </div>
+      )}
+      {online && problem && (
+        <div className="bg-[#FDECEA] border-b border-[#F3B0A8] text-sm px-4 py-2 flex flex-wrap items-center justify-center gap-3" role="alert">
+          <span>{problem}</span>
+          <button className="underline font-semibold" onClick={() => { refresh().catch(() => undefined); reload().catch(() => undefined); }}>Try again</button>
+        </div>
+      )}
+      <main id="main" tabIndex={-1} className="max-w-6xl mx-auto px-4 py-6 outline-none">
+        {org || NO_ORG_PAGES.includes(path) ? children : (
+          <div className="card p-6 max-w-xl">
+            <h1 className="font-head font-extrabold text-2xl mb-2">You are not in a community yet</h1>
+            <p className="text-mute mb-4">{orgs.some((o) => o.status === 'pending')
+              ? 'Your request to join is waiting for an administrator. This screen opens once they approve you.'
+              : 'Ask to join a community, or start an organisation, and this screen will open.'}</p>
+            <Link className="btn btn-gold" href="/organisations">Go to Organisations</Link>
+          </div>
+        )}
+      </main>
+      <footer className="max-w-6xl mx-auto px-4 pb-6 text-xs text-mute flex flex-wrap gap-x-4 gap-y-1">
+        <Link className="underline" href="/privacy">Privacy</Link>
+        <Link className="underline" href="/terms">Terms of use</Link>
+        <Link className="underline" href="/icip">ICIP statement</Link>
+        <Link className="underline" href="/contact">Contact</Link>
+      </footer>
 
       {more && (
         <div className="lg:hidden fixed inset-0 z-40 bg-black/40" onClick={() => setMore(false)}>
@@ -144,7 +192,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
 
   // Pages that work without signing in, or are part of signing in
-  const isPublic = path === '/login' || path === '/setup' || path.startsWith('/public');
+  const isPublic = PUBLIC_PAGES.some((p) => path === p || path.startsWith(p + '/'));
 
   useEffect(() => {
     if (!isPublic) {

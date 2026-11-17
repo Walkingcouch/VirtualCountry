@@ -215,7 +215,7 @@ export async function conversationMembers(convId: string): Promise<string[]> {
 async function conversationKey(convId: string, version: number, me: c.IdentityKeys, myId: string) {
   const { data, error } = await supabase().from('conversation_keys').select('sealed_key').eq('conversation_id', convId).eq('key_version', version).eq('recipient_id', myId).maybeSingle();
   if (error) throw error;
-  if (!data) throw new Error('No key for this conversation');
+  if (!data) throw new Error('You joined this chat after it was set up, so this device does not hold its key yet. It will open once another person in the chat opens it.');
   return c.unseal(data.sealed_key, me);
 }
 
@@ -258,19 +258,31 @@ export async function createConversation(orgId: string, title: string, memberIds
     throw new Error(`${names} has not finished setting up, so a locked chat cannot be started with them yet.`);
   }
   const id = crypto.randomUUID();
-  const kind = all.length === 2 ? 'direct' : 'group';
   const others = all.filter((u) => u !== myId).map((u) => dir.members.find((m) => m.user_id === u)?.display_name?.split(' (')[0] ?? 'Member');
-  const name = title.trim() || (kind === 'direct' ? others[0] : others.join(', '));
-  let r = await sb.from('conversations').insert({ id, org_id: orgId, kind, title: name, created_by: myId });
-  if (r.error) throw r.error;
-  r = await sb.from('conversation_members').insert(all.map((u) => ({ conversation_id: id, user_id: u })));
-  if (r.error) throw r.error;
+  const name = (title.trim() || (all.length === 2 ? others[0] : others.join(', '))).slice(0, 120);
   const key = await c.randomKey();
-  const rows = [];
-  for (const u of all) rows.push({ conversation_id: id, key_version: 1, recipient_id: u, sealed_key: await c.seal(key, encPk.get(u)!) });
-  r = await sb.from('conversation_keys').insert(rows);
-  if (r.error) throw r.error;
+  const keys = [];
+  for (const u of all) keys.push({ recipient_id: u, sealed_key: await c.seal(key, encPk.get(u)!) });
+  // One database call: the chat, its people and their locked keys are saved together or not at all.
+  const { error } = await sb.rpc('create_conversation', { p_id: id, p_org: orgId, p_title: name, p_members: all, p_keys: keys });
+  if (error) throw error;
   return id;
+}
+
+/** Give the chat key to people who joined after it was made (for example a new administrator on a bridge).
+ *  Runs on the device of someone who already holds the key. Returns how many people were given it. */
+export async function shareMissingKeys(conv: Conversation, me: c.IdentityKeys, myId: string): Promise<number> {
+  const sb = supabase();
+  const { data, error } = await sb.rpc('conv_missing_keys', { p_conv: conv.id });
+  if (error) throw error;
+  const missing = ((data ?? []) as { user_id: string; enc_pk: string }[]).filter((r) => r.user_id !== myId);
+  if (!missing.length) return 0;
+  const key = await conversationKey(conv.id, conv.key_version, me, myId);
+  const rows = [];
+  for (const r of missing) rows.push({ conversation_id: conv.id, key_version: conv.key_version, recipient_id: r.user_id, sealed_key: await c.seal(key, r.enc_pk) });
+  const ins = await sb.from('conversation_keys').insert(rows);
+  if (ins.error) throw ins.error;
+  return rows.length;
 }
 
 /** Latest message time and sender per conversation, for unread markers. Message content is never read here. */
@@ -353,10 +365,20 @@ export async function createOrg(name: string, kind: 'community' | 'partner'): Pr
   return data as string;
 }
 export async function askToJoin(orgId: string, userId: string) {
-  const { error } = await supabase().from('org_members').insert({ org_id: orgId, user_id: userId, status: 'pending' });
+  const sb = supabase();
+  const existing = await sb.from('org_members').select('status').eq('org_id', orgId).eq('user_id', userId).maybeSingle();
+  if (existing.error) throw existing.error;
+  // Someone who left or was removed asks again on their old row. An administrator still has to approve them.
+  const { error } = existing.data
+    ? await sb.from('org_members').update({ status: 'pending' }).eq('org_id', orgId).eq('user_id', userId).eq('status', 'removed')
+    : await sb.from('org_members').insert({ org_id: orgId, user_id: userId, status: 'pending' });
   if (error) throw error;
 }
-/** Administrators only. Every organisation keeps at least one administrator (enforced by the database). */
+/** Leave an organisation. Administrators hand the role to someone else first. */
+export async function leaveOrg(orgId: string, userId: string) {
+  const { error } = await supabase().from('org_members').update({ status: 'removed' }).eq('org_id', orgId).eq('user_id', userId);
+  if (error) throw error;
+}
 export async function setAdmin(orgId: string, userId: string, value: boolean) {
   const { error } = await supabase().from('org_members').update({ is_admin: value }).eq('org_id', orgId).eq('user_id', userId);
   if (error) throw error;
@@ -367,9 +389,9 @@ export async function setAdmin(orgId: string, userId: string, value: boolean) {
    ========================================================= */
 export interface AuditRow { id: number; actor_id: string | null; action: string; target_type: string; target_id: string; at: string; hash: string; prev_hash: string; detail_hash: string | null; detail?: Record<string, unknown> }
 /** Everyone in the community sees the actions. Administrators and Cultural Authorities also see the detail (who, what changed). */
-export async function loadAudit(orgId: string): Promise<AuditRow[]> {
+export async function loadAudit(orgId: string, limit = 200): Promise<AuditRow[]> {
   const sb = supabase();
-  const { data, error } = await sb.from('audit_log').select('id, actor_id, action, target_type, target_id, at, hash, prev_hash, detail_hash').eq('org_id', orgId).order('id', { ascending: false }).limit(200);
+  const { data, error } = await sb.from('audit_log').select('id, actor_id, action, target_type, target_id, at, hash, prev_hash, detail_hash').eq('org_id', orgId).order('id', { ascending: false }).limit(limit);
   if (error) throw error;
   const rows = (data ?? []) as AuditRow[];
   const ids = rows.filter((r) => r.detail_hash).map((r) => r.id);
@@ -405,4 +427,51 @@ export async function myItemKey(itemId: string, version: number, me: c.IdentityK
   if (error) throw error;
   if (!data) throw new Error('This device does not hold a key for this item');
   return c.unseal(data.sealed_key, me);
+}
+
+/* =========================================================
+   Groups (administrators)
+   ========================================================= */
+export type GroupKind = 'family' | 'school' | 'rangers' | 'custom';
+export async function createGroup(orgId: string, name: string, kind: GroupKind) {
+  const { error } = await supabase().from('groups').insert({ org_id: orgId, name: name.trim(), kind });
+  if (error) throw error;
+}
+export async function addToGroup(groupId: string, userId: string) {
+  const { error } = await supabase().from('group_members').insert({ group_id: groupId, user_id: userId });
+  if (error) throw error;
+}
+export async function removeFromGroup(groupId: string, userId: string) {
+  const { error } = await supabase().from('group_members').delete().eq('group_id', groupId).eq('user_id', userId);
+  if (error) throw error;
+}
+
+/* =========================================================
+   Deleting an item
+   ========================================================= */
+/** Holder only. Removes the encrypted files, then erases the stored text and every key. This cannot be undone. */
+export async function deleteItem(itemId: string, media: MediaRef[]) {
+  const sb = supabase();
+  if (media.length) {
+    const { error } = await sb.storage.from('media').remove(media.map((m) => m.path));
+    if (error) throw error;
+  }
+  const { error } = await sb.rpc('delete_item', { p_item: itemId });
+  if (error) throw error;
+}
+
+/* =========================================================
+   Governance log export
+   ========================================================= */
+const csvCell = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+/** The governance log as CSV text. Names are filled in on this device; the hashes let anyone re-check the chain later. */
+export function auditCsv(rows: AuditRow[], nameOf: (id: string) => string, describe: (action: string) => string): string {
+  const head = ['id', 'when_utc', 'who', 'what', 'action_code', 'target_type', 'target', 'detail', 'prev_hash', 'hash'];
+  const isId = (v: string) => /^[0-9a-f-]{36}$/.test(v);
+  const lines = rows.map((r) => [
+    r.id, r.at, r.actor_id ? nameOf(r.actor_id) : 'System', describe(r.action), r.action, r.target_type,
+    r.target_type === 'user' && isId(r.target_id) ? nameOf(r.target_id) : r.target_id,
+    r.detail ? JSON.stringify(r.detail) : '', r.prev_hash, r.hash,
+  ].map(csvCell).join(','));
+  return [head.join(','), ...lines].join('\r\n');
 }

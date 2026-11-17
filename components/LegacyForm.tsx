@@ -2,6 +2,7 @@
 import { useMemo, useState } from 'react';
 import { useSession } from '@/lib/session';
 import { createWish, describeWhen, WHEN_TEXT, type LegacyRecipient, type LegacyWhen, type LegacyWish } from '@/lib/legacy';
+import { friendly } from '@/lib/errors';
 import type { OpenItem } from '@/lib/data';
 
 /** The holder's legacy wish for one item: who receives it later, who never does, when, and who keeps the parts of the key. */
@@ -55,7 +56,7 @@ export default function LegacyForm({ it, onDone, onCancel }: { it: OpenItem; onD
       };
       await createWish({ orgId: org.id, itemId: it.row.id, version: it.version, wish, keeperIds: keepers, threshold, me: keys, myId: userId, dir });
       onDone(`Legacy wish saved. ${keepers.length} keepers each hold one part of the key. ${threshold} must agree before anyone receives it.`);
-    } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
+    } catch (e) { setErr(friendly(e)); } finally { setBusy(false); }
   };
 
   return (
@@ -148,7 +149,7 @@ export default function LegacyForm({ it, onDone, onCancel }: { it: OpenItem; onD
         {keepers.length >= 2 && (
           <label className="flex flex-wrap items-center gap-2 text-sm">
             How many keepers must agree
-            <select className="select !w-auto" value={threshold} onChange={(e) => setThreshold(Number(e.target.value))}>
+            <select className="select !w-auto" aria-label="How many keepers must agree" value={threshold} onChange={(e) => setThreshold(Number(e.target.value))}>
               {Array.from({ length: keepers.length - 1 }, (_, i) => i + 2).map((n) => <option key={n} value={n}>{n} of {keepers.length}</option>)}
             </select>
           </label>

@@ -2,9 +2,10 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { DEMO_MODE, DEMO_PASSPHRASE, DEMO_PASSWORD, DEMO_PEOPLE, supabase } from '@/lib/supabase';
+import { DEMO_PASSPHRASE, DEMO_PASSWORD, DEMO_PEOPLE, supabase } from '@/lib/supabase';
 import { useSession } from '@/lib/session';
 import { fetchVault, unlockWithPassphrase } from '@/lib/vault';
+import { friendly } from '@/lib/errors';
 import Logo from '@/components/Logo';
 
 export default function Login() {
@@ -39,7 +40,7 @@ export default function Login() {
       if (v) setKeys(await unlockWithPassphrase(v, DEMO_PASSPHRASE));
       router.replace('/');
     } catch (err) {
-      setMsg((err as Error).message);
+      setMsg(friendly(err));
     } finally { setBusy(null); }
   };
 
@@ -60,7 +61,7 @@ export default function Login() {
         } else await refresh();
       }
     } catch (err) {
-      setMsg((err as Error).message);
+      setMsg(friendly(err));
     } finally { setBusy(null); }
   };
 
@@ -84,10 +85,17 @@ export default function Login() {
               {mode === 'signin' ? 'New here? Create an account and ask to join a community' : 'Already have an account? Sign in'}
             </button>
           </form>
-          <p className="text-white/50 text-xs mt-8 max-w-sm">Production sign-in uses a one-time code or a passkey (face or fingerprint). Then your own passphrase unlocks your keys on your device. Your passphrase is never sent to the server.</p>
+          <p className="text-white/70 text-sm mt-6 max-w-sm flex flex-wrap gap-x-4 gap-y-1">
+            <Link className="underline" href="/public">Public page</Link>
+            <Link className="underline" href="/privacy">Privacy</Link>
+            <Link className="underline" href="/terms">Terms</Link>
+            <Link className="underline" href="/icip">ICIP statement</Link>
+            <Link className="underline" href="/contact">Contact</Link>
+          </p>
+          <p className="text-white/60 text-xs mt-6 max-w-sm">Production sign-in uses a one-time code or a passkey (face or fingerprint). Then your own passphrase unlocks your keys on your device. Your passphrase is never sent to the server.</p>
         </section>
 
-        {DEMO_MODE && (
+        {process.env.NEXT_PUBLIC_DEMO_MODE === 'true' && (
           <section>
             <div className="label label-dark mb-3">One-tap demo people <span className="rule" /></div>
             <p className="text-white/75 mb-4">Everyone and everything in Demo Country is invented. Sign in as different people to see the cultural locks working. Each person only sees what their keys open.</p>
@@ -100,7 +108,7 @@ export default function Login() {
                 </button>
               ))}
             </div>
-            <p className="text-white/40 text-xs mt-4">Demo password {DEMO_PASSWORD} · demo passphrase {DEMO_PASSPHRASE}</p>
+            <p className="text-white/60 text-xs mt-4">Demo password {DEMO_PASSWORD} · demo passphrase {DEMO_PASSPHRASE}</p>
             <p className="text-white/60 text-sm mt-4">Need help? <a className="underline" href="mailto:contact@firstgeospatial.com.au">contact@firstgeospatial.com.au</a></p>
           </section>
         )}

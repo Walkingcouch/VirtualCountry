@@ -5,6 +5,7 @@ import { useSession } from '@/lib/session';
 import { loadReleases, signRelease, verifyRelease, type Release } from '@/lib/data';
 import { supabase } from '@/lib/supabase';
 import { TK_LABELS } from '@/lib/model';
+import { friendly } from '@/lib/errors';
 import DemoMap from '@/components/DemoMap';
 
 type Row = Release & { ok?: boolean };
@@ -22,7 +23,7 @@ export default function Releases() {
     const pk = new Map((dir?.members ?? []).map((m) => [m.user_id, m.sign_pk]));
     setRows(await Promise.all(r.map(async (x) => ({ ...x, ok: x.status === 'published' ? await verifyRelease(x, pk.get(x.signer_id ?? '')) : undefined }))));
   }, [org, dir]);
-  useEffect(() => { load().catch((e) => setMsg(e.message)); }, [load]);
+  useEffect(() => { load().catch((e) => setMsg(friendly(e))); }, [load]);
 
   const act = async (r: Release, what: 'sign' | 'reject' | 'withdraw') => {
     if (!keys) return;
@@ -33,7 +34,7 @@ export default function Releases() {
       if (what === 'withdraw') { const { error } = await supabase().rpc('withdraw_release', { p_release: r.id }); if (error) throw error; }
       setMsg(what === 'sign' ? 'Signed and published. It now appears on the public page.' : what === 'reject' ? 'Returned without publishing.' : 'Withdrawn from public view.');
       await load();
-    } catch (e) { setMsg((e as Error).message); } finally { setBusy(''); }
+    } catch (e) { setMsg(friendly(e)); } finally { setBusy(''); }
   };
 
   const section = (title: string, list: Row[], empty: string) => (

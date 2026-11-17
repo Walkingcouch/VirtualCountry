@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useSession } from '@/lib/session';
 import { useItems } from '@/lib/items-context';
+import { friendly } from '@/lib/errors';
 import { approveRelease, closeWish, describeWhen, loadLegacy, receive, withdrawApproval, type LegacyView } from '@/lib/legacy';
 
 const short = (n: string) => n.split(' (')[0];
@@ -19,13 +20,13 @@ export default function Legacy() {
 
   const load = useCallback(async () => {
     if (!keys || !userId || !org) return;
-    try { setViews(await loadLegacy(keys, userId, org.id)); } catch (e) { setMsg((e as Error).message); } finally { setLoading(false); }
+    try { setViews(await loadLegacy(keys, userId, org.id)); } catch (e) { setMsg(friendly(e)); } finally { setLoading(false); }
   }, [keys, userId, org]);
   useEffect(() => { load(); }, [load]);
 
   const run = async (key: string, fn: () => Promise<unknown>, ok: string) => {
     setBusy(key); setMsg('');
-    try { await fn(); setMsg(ok); await load(); } catch (e) { setMsg((e as Error).message); } finally { setBusy(''); }
+    try { await fn(); setMsg(ok); await load(); } catch (e) { setMsg(friendly(e)); } finally { setBusy(''); }
   };
 
   const active = views.filter((v) => v.row.status === 'active');

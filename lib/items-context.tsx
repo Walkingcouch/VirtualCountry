@@ -3,8 +3,9 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { useSession } from './session';
 import { loadItems, type OpenItem } from './data';
 import type { DenyEntry } from './guide';
+import { friendly } from './errors';
 
-interface ItemsValue { items: OpenItem[]; loading: boolean; failures: number; reload: () => Promise<void>; deny: DenyEntry[] }
+interface ItemsValue { items: OpenItem[]; loading: boolean; failures: number; error: string; reload: () => Promise<void>; deny: DenyEntry[] }
 const Ctx = createContext<ItemsValue | null>(null);
 export const useItems = () => {
   const v = useContext(Ctx);
@@ -36,21 +37,30 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<OpenItem[]>([]);
   const [failures, setFailures] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const reload = useCallback(async () => {
-    if (!keys || !userId || !org || !dir) return;
+    if (!keys || !userId) return;
+    // No community yet (for example a request still waiting): there is nothing to open, and nothing to wait for.
+    if (!org) { setItems([]); setFailures(0); setLoading(false); return; }
+    if (!dir) { setLoading(true); return; }
+    // While switching community, the directory still belongs to the last one. Wait for the right one.
+    if (dir.orgId !== org.id) { setItems([]); setLoading(true); return; }
     setLoading(true);
+    setError('');
     try {
       const r = await loadItems(org.id, keys, userId, dir);
       setItems(r.items);
       setFailures(r.failures);
+    } catch (e) {
+      setError(friendly(e));
     } finally {
       setLoading(false);
     }
   }, [keys, userId, org, dir]);
 
-  useEffect(() => { if (status === 'ready') reload().catch(console.error); else setItems([]); }, [status, reload]);
+  useEffect(() => { if (status === 'ready') reload(); else setItems([]); }, [status, reload]);
 
   const names = (dir?.members ?? []).filter((m) => m.user_id !== userId).map((m) => m.display_name);
-  return <Ctx.Provider value={{ items, loading, failures, reload, deny: buildDeny(items, names) }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ items, loading, failures, error, reload, deny: buildDeny(items, names) }}>{children}</Ctx.Provider>;
 }

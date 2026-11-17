@@ -2,7 +2,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from '@/lib/session';
-import { allOrgs, askToJoin, createOrg } from '@/lib/data';
+import { allOrgs, askToJoin, createOrg, leaveOrg } from '@/lib/data';
+import { friendly } from '@/lib/errors';
 
 const KIND: Record<string, string> = { community: 'Community', partner: 'Partner organisation', school: 'School' };
 
@@ -16,13 +17,13 @@ export default function Organisations() {
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState('');
 
-  useEffect(() => { allOrgs().then(setAll).catch((e) => setErr(e.message)); }, []);
+  useEffect(() => { allOrgs().then(setAll).catch((e) => setErr(friendly(e))); }, []);
   const mine = new Map(orgs.map((o) => [o.id, o]));
   const others = all.filter((o) => !mine.has(o.id) || mine.get(o.id)!.status === 'removed');
 
   const run = async (key: string, fn: () => Promise<unknown>, ok: string) => {
     setBusy(key); setErr(''); setMsg('');
-    try { await fn(); setMsg(ok); await refresh(); setAll(await allOrgs()); } catch (e) { setErr((e as Error).message); } finally { setBusy(''); }
+    try { await fn(); setMsg(ok); await refresh(); setAll(await allOrgs()); } catch (e) { setErr(friendly(e)); } finally { setBusy(''); }
   };
 
   const start = () => run('new', async () => {
@@ -61,6 +62,15 @@ export default function Organisations() {
               {o.status === 'active' && org?.id !== o.id && (
                 <button className="btn btn-ink !min-h-10" onClick={() => { setOrgId(o.id); router.push('/'); }}>Switch to this</button>
               )}
+              {!o.is_admin && <button className="btn btn-line !min-h-10" disabled={busy === `leave-${o.id}`}
+                onClick={() => {
+                  if (!userId) return;
+                  const pending = o.status === 'pending';
+                  if (!confirm(pending ? `Withdraw your request to join ${o.name}?` : `Leave ${o.name}?\n\nYou will stop seeing its stories and chats straight away. Download anything you want to keep first (Me, then Download my data). You can ask to join again later.`)) return;
+                  run(`leave-${o.id}`, () => leaveOrg(o.id, userId), pending ? 'Request withdrawn.' : `You have left ${o.name}.`);
+                }}>
+                {o.status === 'pending' ? 'Withdraw request' : 'Leave'}
+              </button>}
             </div>
           ))}
         </div>

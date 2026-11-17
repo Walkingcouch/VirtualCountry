@@ -2,7 +2,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useSession } from '@/lib/session';
 import Link from 'next/link';
-import { issueAttestation, loadAudit, revokeAttestations, setAdmin, verifyChain, type AuditRow } from '@/lib/data';
+import { auditCsv, issueAttestation, loadAudit, revokeAttestations, setAdmin, verifyChain, type AuditRow } from '@/lib/data';
+import { friendly } from '@/lib/errors';
+import GroupsAdmin from '@/components/GroupsAdmin';
 import { supabase } from '@/lib/supabase';
 import type { Attestation } from '@/lib/model';
 
@@ -18,6 +20,8 @@ const ACTION_TEXT: Record<string, string> = {
   'legacy.wish_replaced': 'Legacy wish renewed', 'legacy.wish_fulfilled': 'Legacy wish completed',
   'org.created': 'Organisation started', 'bridge.requested': 'Bridge requested', 'bridge.accepted': 'Bridge request accepted', 'bridge.declined': 'Bridge request declined',
   'bridge.withdrawn': 'Bridge request withdrawn', 'bridge.active': 'Bridge opened',
+  'group.created': 'Group created', 'group.member_added': 'Added to a group', 'group.member_removed': 'Taken out of a group',
+  'member.content_granted': 'Given content keys', 'member.content_removed': 'Content keys removed',
 };
 const CLAIM_TEXT: Record<string, string> = {
   'standing:women': "women's standing", 'standing:men': "men's standing", 'role:cultural_authority': 'Cultural Authority', 'role:recovery_keeper': 'Recovery Keeper',
@@ -33,7 +37,7 @@ const DETAIL_LABEL: Record<string, string> = {
   signed_by: 'Signed by', removed_by: 'Removed by', originally_signed_by: 'Originally signed by', decided_by: 'Decided by', subject: 'Person', claim: 'What',
   added: 'Now can open', removed: 'Can no longer open', people_now: 'People who can open it', version: 'Version', from: 'From', to: 'To', status: 'Status',
   keeper: 'Keeper', received_by: 'Received by', keepers_needed: 'Keepers who must agree', title: 'Title', drafted_by: 'Drafted by', content_member: 'Receives content keys',
-  before: 'Before', after: 'After', created_by: 'Started by', kind: 'Type', issued_at: 'Signed at', item_version: 'Item version', wish: 'Legacy wish', item: 'Item',
+  before: 'Before', after: 'After', group: 'Group', created_by: 'Started by', kind: 'Type', issued_at: 'Signed at', item_version: 'Item version', wish: 'Legacy wish', item: 'Item',
 };
 const isUuid = (v: unknown) => typeof v === 'string' && /^[0-9a-f-]{36}$/.test(v);
 
@@ -56,15 +60,15 @@ export default function Community() {
     const s = await supabase().from('org_settings').select('ai_help, idle_lock_minutes').eq('org_id', org.id).maybeSingle();
     setSettings(s.data);
   }, [org]);
-  useEffect(() => { load().catch((e) => setMsg(e.message)); }, [load]);
+  useEffect(() => { load().catch((e) => setMsg(friendly(e))); }, [load]);
 
   const run = async (fn: () => Promise<unknown>, ok: string) => {
     setMsg('');
-    try { await fn(); setMsg(ok); await refresh(); await load(); } catch (e) { setMsg((e as Error).message); }
+    try { await fn(); setMsg(ok); await refresh(); await load(); } catch (e) { setMsg(friendly(e)); }
   };
 
   const setStatus = (uid: string, status: 'active' | 'removed') => run(async () => {
-    const { error } = await supabase().from('org_members').update({ status, approved_by: userId, approved_at: new Date().toISOString() }).eq('org_id', org!.id).eq('user_id', uid);
+    const { error } = await supabase().from('org_members').update({ status }).eq('org_id', org!.id).eq('user_id', uid);
     if (error) throw error;
   }, status === 'active' ? 'Approved. Holders will see an "Update access" prompt so the new member receives keys.' : 'Removed. Holders will re-lock their items without this person.');
 
@@ -77,6 +81,25 @@ export default function Community() {
     const one = cas.size <= 1;
     if (!confirm(`Put ${nameOf(uid).split(' (')[0]} forward as a Cultural Authority?\n\nCultural Authorities confirm cultural standing and sign public summaries.${one ? '' : '\n\nA second Cultural Authority must also agree before it takes effect.'}`)) return;
     attest(uid, 'role:cultural_authority', one ? 'Signed. They are now a Cultural Authority.' : 'Signed. Waiting for a second Cultural Authority to agree.');
+  };
+
+  const setContent = (uid: string, value: boolean) => run(async () => {
+    const { error } = await supabase().from('org_members').update({ content_member: value }).eq('org_id', org!.id).eq('user_id', uid);
+    if (error) throw error;
+  }, value ? 'They will receive keys the next time holders update access. This is in the governance log.' : 'They will stop receiving keys. Holders will see an "Update access" prompt. This is in the governance log.');
+
+  const [exporting, setExporting] = useState(false);
+  const exportLog = async () => {
+    if (!org) return;
+    setExporting(true); setMsg('');
+    try {
+      const rows = await loadAudit(org.id, 5000);
+      const csv = auditCsv(rows.reverse(), (id) => nameOf(id).split(' (')[0], describe);
+      const url = URL.createObjectURL(new Blob(['\ufeff', csv], { type: 'text/csv;charset=utf-8' }));
+      const a = document.createElement('a');
+      a.href = url; a.download = `governance-log-${org.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-${new Date().toISOString().slice(0, 10)}.csv`; a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) { setMsg(friendly(e)); } finally { setExporting(false); }
   };
 
   const saveSettings = (patch: Partial<{ ai_help: boolean; idle_lock_minutes: number }>) => run(async () => {
@@ -144,6 +167,11 @@ export default function Community() {
                     <button className="btn btn-line !min-h-10" onClick={() => { if (confirm(me ? `Stop being an administrator of ${org.name}? Another administrator will need to make you one again.` : `Remove the administrator role from ${m.display_name.split(' (')[0]}?`)) run(() => setAdmin(org.id, m.user_id, false), me ? 'You are no longer an administrator.' : 'Administrator role removed. This is recorded in the governance log.'); }}>{me ? 'Step down as administrator' : 'Remove administrator'}</button>
                   )}
                   {isAdmin && m.status === 'active' && !me && <button className="btn btn-danger !min-h-10" onClick={() => { if (confirm(`Remove ${m.display_name} from ${org.name}?`)) setStatus(m.user_id, 'removed'); }}>Remove</button>}
+                  {isAdmin && m.status === 'active' && !me && (
+                    <button className="btn btn-line !min-h-10" onClick={() => { if (confirm(m.content_member ? `Stop ${m.display_name.split(' (')[0]} receiving content keys?\n\nUse this for someone who runs the organisation but should not open stories.` : `Let ${m.display_name.split(' (')[0]} receive content keys?\n\nHolders can then share stories with them.`)) setContent(m.user_id, !m.content_member); }}>
+                      {m.content_member ? 'Remove content keys' : 'Give content keys'}
+                    </button>
+                  )}
                   {isCa && m.status === 'active' && m.content_member && (
                     <>
                       {!st.has('standing:women') && !st.has('standing:men') && (
@@ -171,13 +199,15 @@ export default function Community() {
         <p className="text-xs text-mute mt-2">Standings and roles are confirmed by Cultural Authorities with a digital signature, and can be undone. A new Cultural Authority needs two Cultural Authorities to agree (while there is only one, they can appoint the second). Administrators cannot confirm standings, and cannot give themselves keys. An administrator can make another member an administrator; every organisation always keeps at least one.</p>
       </section>
 
+      <GroupsAdmin onChanged={load} />
+
       {isAdmin && settings && (
         <section>
           <h2 className="font-head font-semibold text-lg mb-3">Settings (administrator)</h2>
           <div className="card p-4 grid sm:grid-cols-2 gap-4">
             <label className="flex items-center justify-between gap-3"><span>AI Guide (help mode) for everyone</span><input type="checkbox" checked={settings.ai_help} onChange={(e) => saveSettings({ ai_help: e.target.checked })} /></label>
             <label className="flex items-center justify-between gap-3"><span>Lock automatically after (minutes)</span>
-              <select className="select !w-28" value={settings.idle_lock_minutes} onChange={(e) => saveSettings({ idle_lock_minutes: Number(e.target.value) })}>{[2, 5, 10, 15, 30, 60].map((n) => <option key={n}>{n}</option>)}</select>
+              <select className="select !w-28" aria-label="Minutes before the app locks itself" value={settings.idle_lock_minutes} onChange={(e) => saveSettings({ idle_lock_minutes: Number(e.target.value) })}>{[2, 5, 10, 15, 30, 60].map((n) => <option key={n}>{n}</option>)}</select>
             </label>
           </div>
         </section>
@@ -192,10 +222,11 @@ export default function Community() {
           Every action is linked to the one before it by a fingerprint, so any change or deletion is detected. The log records actions only. It never contains content.
           {seesDetail ? ' As an administrator or Cultural Authority you can open each entry for full detail: who signed, who was added or removed, and what changed.' : ' Administrators and Cultural Authorities can open each entry for more detail.'}
         </p>
-        <div className="flex flex-wrap gap-1 mb-3" role="tablist">
+        <div className="flex flex-wrap items-center gap-1 mb-3" role="group" aria-label="Filter the log">
           {(['all', 'people', 'items', 'legacy', 'releases', 'bridges'] as const).map((f) => (
-            <button key={f} onClick={() => setFilter(f)} className={`chip !py-1.5 !px-3 ${filter === f ? '!bg-ink !text-white' : ''}`}>{f === 'all' ? 'Everything' : f[0].toUpperCase() + f.slice(1)}</button>
+            <button key={f} onClick={() => setFilter(f)} aria-pressed={filter === f} className={`chip !py-1.5 !px-3 ${filter === f ? '!bg-ink !text-white' : ''}`}>{f === 'all' ? 'Everything' : f[0].toUpperCase() + f.slice(1)}</button>
           ))}
+          <button className="btn btn-line !min-h-9 !py-1 ml-auto" onClick={exportLog} disabled={exporting}>{exporting ? 'Preparing…' : 'Download log (CSV)'}</button>
         </div>
         <div className="card divide-y divide-line text-sm">
           {shown.map((a) => (

@@ -14,14 +14,16 @@ export function supabase(): SupabaseClient {
 }
 
 export const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
-export const DEMO_PASSWORD = 'VirtualCountry-demo-2026';
-export const DEMO_PASSPHRASE = 'country-demo';
+/** Demo sign-in details. They are compiled into the site only when demo mode is on. */
+export const DEMO_PASSWORD = DEMO_MODE ? 'VirtualCountry-demo-2026' : '';
+export const DEMO_PASSPHRASE = DEMO_MODE ? 'country-demo' : '';
 
-export const DEMO_PEOPLE = [
+export interface DemoPerson { email: string; name: string; role: string; tip: string }
+export const DEMO_PEOPLE: DemoPerson[] = DEMO_MODE ? [
   { email: 'rose.demo@example.com', name: 'Rose', role: "Elder · founding Cultural Authority · women's standing", tip: "Sees women's items, family items, and can sign public releases." },
   { email: 'tom.demo@example.com', name: 'Tom', role: "Elder · Cultural Authority · men's standing", tip: "Sees men's items. Can sign Daniel's waiting release." },
   { email: 'maya.demo@example.com', name: 'Maya', role: "Teacher · women's standing · Recovery Keeper", tip: "Sees women's and family items. Has a private 'only me' note." },
   { email: 'daniel.demo@example.com', name: 'Daniel', role: "Ranger · men's standing", tip: "Never receives women's or family keys. Drafted a release waiting for sign-off." },
   { email: 'sam.demo@example.com', name: 'Sam', role: 'Community Administrator', tip: 'Runs the community but holds no content keys. Sees zero stories.' },
   { email: 'lee.demo@example.com', name: 'Dr Lee', role: 'Researcher · partner organisation administrator', tip: 'Outside the community. Can only talk to Sam through the transparent bridge.' },
-];
+] : [];

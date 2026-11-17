@@ -48,7 +48,10 @@ export async function caState(dir: Directory): Promise<{ cas: Set<string>; pendi
     if (a.claim === 'role:cultural_authority') { if (cas.has(a.subject_id)) valid.push(a); }
     else if (await sigOk(a)) valid.push(a);
   }
-  return { cas, pending, valid };
+  // Standings signed while someone was a Cultural Authority stay valid. Their powers end when they stop being an active member,
+  // which is the same rule the database applies (vc_is_ca).
+  const active = new Set(Array.from(cas).filter((id) => byId.get(id)?.status === 'active'));
+  return { cas: active, pending, valid };
 }
 
 /** Returns the attestations whose signatures check out and whose issuer is a valid Cultural Authority. */

@@ -58,3 +58,19 @@ export async function rewrapPassphrase(userId: string, amk: Uint8Array, newPassp
   const { error } = await supabase().from('vaults').update({ amk_pin: await c.wrapWithPassphrase(amk, newPassphrase), updated_at: new Date().toISOString() }).eq('user_id', userId);
   if (error) throw error;
 }
+
+/** Change the passphrase when the current one is known. */
+export async function changePassphrase(userId: string, vault: VaultRow, current: string, next: string) {
+  const amk = await c.unwrapWithPassphrase(vault.amk_pin, current);
+  await rewrapPassphrase(userId, amk, next);
+}
+
+/** Make a new recovery card. The old card stops working straight away. Needs the passphrase, to prove it is really the owner. */
+export async function newRecoveryCard(userId: string, vault: VaultRow, passphrase: string): Promise<string> {
+  const amk = await c.unwrapWithPassphrase(vault.amk_pin, passphrase);
+  const code = await c.newRecoveryCode();
+  const { error } = await supabase().from('vaults').update({ amk_recovery: await c.wrapWithPassphrase(amk, code), updated_at: new Date().toISOString() }).eq('user_id', userId);
+  if (error) throw error;
+  return code;
+}
+
