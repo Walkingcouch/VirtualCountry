@@ -9,14 +9,17 @@ This repository is the minimum viable product (MVP) demo. It runs on a Supabase 
 
 | Area | What works now |
 |---|---|
-| Accounts and keys | Sign-in, key creation on the device, passphrase lock, printed recovery code, six-word safety code, key-change alerts |
+| Accounts and keys | Sign-in, key creation on the device, passphrase lock with strength rules, recovery card (shown once, replaceable), change passphrase, six-word safety code, key-change alerts |
 | Record | Stories, places, photos and audio, encrypted on the device before upload |
 | Cultural locks | Women's, men's, family, named people, only me, sacred, deceased and seasonal flags. Keys go only to people a Cultural Authority has confirmed |
 | Sorry business | Pause re-locks an item to the holder alone |
+| Delete | A holder can delete an item for good: stored text, files and every key are erased |
 | Map | Invented Demo Country map. Exact places stay locked; public releases show a blurred square only |
 | Releases | Holder drafts a public summary, a Cultural Authority signs it, and the public page checks the signature |
 | Messages | End-to-end encrypted chats inside one organisation. Other organisations are reached only through an administrator bridge that every member can see |
-| Community | Approve and remove members, confirm standings by signature, settings, governance log with hash chain check |
+| Community | Approve and remove members, administrators, content keys, groups, standings by signature, settings, governance log with hash chain check and CSV download |
+| Organisations | Start one, ask to join, leave, ask again. Bridges need an administrator on each side to agree |
+| Policies | Privacy notice, terms of use, ICIP statement and contact page, as drafts for legal review |
 | Guide | Help mode that answers from built-in help and blocks locked terms, coordinates, emails, phone numbers and recovery codes |
 | Your data | Download everything you can open |
 
@@ -28,8 +31,9 @@ Requires Node 22 or later.
 npm install
 cp .env.example .env.local     # then paste the publishable key from Supabase
 npm run dev                    # http://localhost:3000
-npm test                       # crypto and seed round-trip tests
-npm run build                  # production build check
+npm run check                  # type check, unit tests and production build
+npm run test:e2e               # browser tests on public pages (run npm run build first)
+E2E_FULL=1 npm run test:e2e    # also the signed-in journeys; needs the demo database
 ```
 
 `.env.local` needs:
@@ -40,7 +44,9 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=<publishable key, Supabase > Project Settings > AP
 NEXT_PUBLIC_DEMO_MODE=true
 ```
 
-The Supabase project `virtual-country` (Sydney region) already has both migrations applied and the demo seed loaded.
+The Supabase project `virtual-country` (Sydney region) already has every migration applied and the demo seed loaded.
+
+When `NEXT_PUBLIC_DEMO_MODE` is anything other than `true`, the demo people, password and passphrase are left out of the build.
 
 ## Put the demo online (Vercel)
 
@@ -106,12 +112,20 @@ lib/
   shamir.ts           Shamir secret sharing over GF(256)
   legacy.ts           legacy wishes: split item keys among keepers, release, receive
   notifications.ts    in-app notifications worked out on the device
+  passphrase.ts       passphrase rules and strength hint
+  errors.ts           plain-language error messages
 supabase/
   migrations/         schema, row level security, audit hash chain, RPCs
   seed.sql            generated Demo Country data (npm run seed:sql)
 scripts/seed.ts       seed generator (real keys, real encryption)
 tests/                vitest
-docs/BUILD_PLAN.md    remaining phases for the full build
+docs/
+  BUILD_PLAN.md             remaining phases for the full build
+  PRODUCTION_READINESS.md   what is needed before real community material, with a go/no-go list
+  OPERATIONS.md             routine checks, everyday tasks, what to do when something breaks
+  CHANGELOG.md              what changed in each version
+e2e/                  Playwright browser tests
+supabase/tests/       role-by-role database security suite
 ```
 
 ## Security model in brief
@@ -122,6 +136,8 @@ docs/BUILD_PLAN.md    remaining phases for the full build
 - Every action is written to a hash-chained governance log by database triggers. Rows cannot be updated or deleted by clients. Extra detail for each entry (who signed, who was added or removed) sits in a separate table readable only by administrators and Cultural Authorities, and its fingerprint is part of the chain.
 - A new Cultural Authority needs two existing Cultural Authorities to sign (the founding Cultural Authority alone can appoint the second). Nobody can appoint themselves.
 - Legacy access splits an item's key into parts held by Legacy Keepers. A set number must agree before the database lets the recipient's device add its own key envelope. Nobody on the holder's "never to" list can be chosen.
+- Access follows membership. A person removed from a community loses its chats, its log and every item shared with them. A removed Cultural Authority loses those powers. A former administrator loses the bridges.
+- A key can only be sealed to someone on the signed recipient list, and a public summary must belong to the community that holds the item.
 - Messages stay inside an organisation. The only path between organisations is an administrator bridge whose existence and activity every member can see.
 
 ## Known demo limits
@@ -131,12 +147,16 @@ These are deliberate shortcuts for the sandbox. They are listed in `docs/BUILD_P
 - Supabase cloud and Vercel run on AWS. They are used for the demo only. Production uses self-hosted Supabase on Australian-owned infrastructure or a local server, as set out in the documentation.
 - The key vault is wrapped with the passphrase and stored on the server. Device-bound keys, passkeys and one-time codes come next.
 - Demo accounts share one password and passphrase.
-- The Content Security Policy still allows inline styles required by Next.js.
+- The Content Security Policy still allows inline scripts and styles required by Next.js.
 - The Guide uses built-in help and keyword screening. No language model is connected.
-- Recovery Keepers are shown but in-person recovery is not built yet. Legacy access already uses the same key splitting, so recovery can reuse it.
+- Recovery Keepers are shown but in-person recovery is not built yet. A person who loses both passphrase and recovery card cannot get back in. Legacy access already uses the same key splitting, so recovery can reuse it.
+- When a holder passes away, only items with a legacy wish can be passed on.
+- The signed-in browser journeys in `e2e/flows.spec.ts` have been written but not yet run.
 - Notifications are in-app only. Email and push alerts need a server-side sender (see the build plan).
 - Legacy keepers judge whether a condition is met (age, passing). The app does not check dates of birth or death records.
-- The map is an invented drawing, not real geography.
+- The map is an invented drawing, not real geography. No outside map service is used.
+
+See `docs/PRODUCTION_READINESS.md` for the full list of what must be done before real community material.
 
 Contact: contact@firstgeospatial.com.au
 
