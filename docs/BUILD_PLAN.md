@@ -31,11 +31,11 @@ Deployment setting to check on every new environment: Supabase → Authenticatio
 5. Remove `'unsafe-inline'` from the CSP using nonces.
 6. Rate limits and lockout on sign-in and unlock. (Limits on messages, join requests, bridge requests and waiting releases were added in 0.11.0.)
 7. Email and push notifications: a Supabase Edge Function (or database webhook) that sends "something is waiting for you in Virtual Country" by email and Web Push, never naming content, people or titles. Per-person settings for which alerts to receive, and quiet hours.
+8. Legacy access hardening: keeper replacement when a keeper leaves or passes away (holder re-splits, or remaining keepers re-split by agreement with a waiting period), a waiting period after the threshold is met during which any keeper can object, and a yearly reminder for holders to review their wishes.
 9. Custodians: decide with communities what happens to items with no legacy wish when a holder passes away (for example two Cultural Authorities record the passing and a named custodian receives access), then build it.
 10. Simpler Record screen: title, story and who can open it first, with consent detail, labels and restrictions under "More options".
 11. Second factor (TOTP) required for administrators and Cultural Authorities.
 12. Self-service account closure.
-8. Legacy access hardening: keeper replacement when a keeper leaves or passes away (holder re-splits, or remaining keepers re-split by agreement with a waiting period), a waiting period after the threshold is met during which any keeper can object, and a yearly reminder for holders to review their wishes.
 
 ## Phase 2: Storage options
 
