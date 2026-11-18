@@ -89,6 +89,17 @@ export default function Community() {
     if (error) throw error;
   }, value ? 'They will receive keys the next time holders update access. This is in the governance log.' : 'They will stop receiving keys. Holders will see an "Update access" prompt. This is in the governance log.');
 
+  const [olderBusy, setOlderBusy] = useState(false);
+  const [noOlder, setNoOlder] = useState(false);
+  const showOlder = async () => {
+    if (!org || !audit.length) return;
+    setOlderBusy(true);
+    try {
+      const more = await loadAudit(org.id, 200, audit[audit.length - 1].id);
+      if (more.length < 200) setNoOlder(true);
+      setAudit((a) => [...a, ...more]);
+    } catch (e) { setMsg(friendly(e)); } finally { setOlderBusy(false); }
+  };
   const [exporting, setExporting] = useState(false);
   const exportLog = async () => {
     if (!org) return;
@@ -259,6 +270,7 @@ export default function Community() {
           ))}
           {shown.length === 0 && <p className="p-3 text-mute">Nothing here yet.</p>}
         </div>
+        {audit.length >= 200 && !noOlder && <button className="btn btn-line mt-3" onClick={showOlder} disabled={olderBusy}>{olderBusy ? 'Loading…' : 'Show older entries'}</button>}
       </section>
     </div>
   );

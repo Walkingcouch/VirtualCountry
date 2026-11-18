@@ -68,7 +68,7 @@ export default function Stories() {
 
       <div className="flex flex-wrap gap-2 mb-4">
         {([['all', 'All'], ['mine', 'I hold'], ['shared', 'Shared with me'], ['restricted', 'Restricted']] as const).map(([v, l]) => (
-          <button key={v} onClick={() => setFilter(v)} className={`btn !min-h-10 ${filter === v ? 'btn-ink' : 'btn-line'}`}>{l}</button>
+          <button key={v} aria-pressed={filter === v} onClick={() => setFilter(v)} className={`btn !min-h-10 ${filter === v ? 'btn-ink' : 'btn-line'}`}>{l}</button>
         ))}
         <input className="input !w-auto flex-1 min-w-[200px]" placeholder="Search your stories (on this device)" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search" />
       </div>

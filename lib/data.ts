@@ -389,9 +389,11 @@ export async function setAdmin(orgId: string, userId: string, value: boolean) {
    ========================================================= */
 export interface AuditRow { id: number; actor_id: string | null; action: string; target_type: string; target_id: string; at: string; hash: string; prev_hash: string; detail_hash: string | null; detail?: Record<string, unknown> }
 /** Everyone in the community sees the actions. Administrators and Cultural Authorities also see the detail (who, what changed). */
-export async function loadAudit(orgId: string, limit = 200): Promise<AuditRow[]> {
+export async function loadAudit(orgId: string, limit = 200, beforeId?: number): Promise<AuditRow[]> {
   const sb = supabase();
-  const { data, error } = await sb.from('audit_log').select('id, actor_id, action, target_type, target_id, at, hash, prev_hash, detail_hash').eq('org_id', orgId).order('id', { ascending: false }).limit(limit);
+  let query = sb.from('audit_log').select('id, actor_id, action, target_type, target_id, at, hash, prev_hash, detail_hash').eq('org_id', orgId);
+  if (beforeId !== undefined) query = query.lt('id', beforeId);
+  const { data, error } = await query.order('id', { ascending: false }).limit(limit);
   if (error) throw error;
   const rows = (data ?? []) as AuditRow[];
   const ids = rows.filter((r) => r.detail_hash).map((r) => r.id);

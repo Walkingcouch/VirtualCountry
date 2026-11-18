@@ -1,6 +1,8 @@
 'use client';
 import Link from 'next/link';
 import { useNotes } from '@/lib/notes-context';
+import { useSession } from '@/lib/session';
+import { markRead } from '@/lib/notifications';
 import type { Note } from '@/lib/notifications';
 
 const GROUP: Record<Note['kind'], string> = {
@@ -10,12 +12,18 @@ const ORDER: Note['kind'][] = ['security', 'bridge', 'legacy', 'ca', 'release', 
 
 export default function Notifications() {
   const { notes, reload } = useNotes();
+  const { userId } = useSession();
   return (
     <div className="max-w-3xl">
       <div className="label mb-1">What&apos;s new for you <span className="rule" /></div>
       <div className="flex flex-wrap items-baseline justify-between gap-3 mb-2">
         <h1 className="font-head font-extrabold text-3xl">NOTIFICATIONS</h1>
-        <button className="btn btn-line !min-h-9" onClick={() => reload()}>Check again</button>
+        <div className="flex flex-wrap gap-2">
+          {notes.some((n) => n.kind === 'message') && userId && (
+            <button className="btn btn-line !min-h-9" onClick={() => { notes.filter((n) => n.kind === 'message').forEach((n) => markRead(userId, n.id.replace(/^msg-/, ''), n.at)); reload(); }}>Mark messages as read</button>
+          )}
+          <button className="btn btn-line !min-h-9" onClick={() => reload()}>Check again</button>
+        </div>
       </div>
       <p className="text-mute mb-6 text-sm">Worked out on this device from what you can already see. Nothing about your content leaves your device to make these. Email and phone alerts are planned; they will only ever say &ldquo;something is waiting for you&rdquo;, never what it is.</p>
 
