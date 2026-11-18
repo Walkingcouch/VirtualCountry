@@ -1,9 +1,12 @@
--- Virtual Country security suite. Run against the demo database only.
+-- Virtual Country security suite. For the demo and staging databases ONLY (it needs the demo people). Never install it in production.
 -- Each test acts as one demo person, tries one thing, and is rolled back straight away, so nothing is kept.
 -- "deny" passes when the attempt fails or touches no rows. "allow" passes when it works.
--- The last statement lists every test. Any row with ok = false is a defect.
-create temp table if not exists vc_sec (n int, test text, expect text, ok boolean, note text);
-do $suite$
+-- Paste this whole file into the SQL editor. It installs the suite in a private schema (not reachable through the API) and runs it.
+-- Any row with passed = false is a defect. To run again later: select * from vc_tests.security_suite() order by passed, num;
+create schema if not exists vc_tests;
+revoke all on schema vc_tests from public, anon, authenticated;
+create or replace function vc_tests.security_suite() returns table (num int, test_name text, expected text, passed boolean, detail text)
+language plpgsql set search_path = public as $suite$
 declare
   demo uuid := (select id from orgs where name = 'Demo Country');
   uni  uuid := (select id from orgs where name = 'Demo University (partner)');
@@ -28,7 +31,6 @@ declare
   rel constant uuid := '00000000-0000-4000-8000-0000000000aa';
   t record; n int; ok boolean; note text; i int := 0;
 begin
-  delete from vc_sec;
   for t in select * from (values
     -- visitor (not signed in)
     ('visitor cannot read items', null::uuid, '', 'select count(*) from items', 'deny'),
@@ -128,6 +130,14 @@ begin
        format('select count(*) from (select bridge_action(%L, ''accept'')) s', rel), 'deny'),
     ('former administrator loses the bridge', sam, format('update org_members set is_admin = true where user_id = %L and org_id = %L; update org_members set is_admin = false where user_id = %L and org_id = %L', rose, demo, sam, demo),
        format('select count(*) from messages where conversation_id = %L', bridge), 'deny'),
+    ('member who left can ask to join again', maya, format('update org_members set status = ''removed'' where user_id = %L and org_id = %L', maya, demo),
+       format('with x as (update org_members set status = ''pending'' where user_id = %L and org_id = %L and status = ''removed'' returning 1) select count(*) from x', maya, demo), 'allow'),
+    ('member who left cannot approve themselves', maya, format('update org_members set status = ''removed'' where user_id = %L and org_id = %L', maya, demo),
+       format('with x as (update org_members set status = ''active'' where user_id = %L and org_id = %L returning 1) select count(*) from x', maya, demo), 'deny'),
+    ('member cannot cancel someone else''s request', dan, format('insert into org_members (org_id, user_id, status) values (%L, %L, ''pending'')', demo, lee),
+       format('with x as (update org_members set status = ''removed'' where user_id = %L and org_id = %L returning 1) select count(*) from x', lee, demo), 'deny'),
+    ('member cannot download files of an item not shared with them', dan, '', format('select count(*) from storage.objects where bucket_id = ''media'' and (storage.foldername(name))[2] = %L', womens), 'deny'),
+    ('administrator without content keys cannot download any file', sam, '', 'select count(*) from storage.objects where bucket_id = ''media''', 'deny'),
     ('new administrator joins the bridge', rose, format('update org_members set is_admin = true where user_id = %L and org_id = %L', rose, demo),
        format('select count(*) from conversation_members where conversation_id = %L and user_id = %L', bridge, rose), 'allow')
   ) v(name, actor, setup, q, expect) loop
@@ -151,7 +161,10 @@ begin
       when others then n := -2; note := 'set-up failed: ' || left(sqlerrm, 90);
     end;
     ok := case when n = -2 then false when t.expect = 'allow' then coalesce(n, 0) > 0 else coalesce(n, 0) <= 0 end;
-    insert into vc_sec values (i, t.name, t.expect, ok, note);
+    num := i; test_name := t.name; expected := t.expect; passed := ok; detail := note;
+    return next;
   end loop;
 end $suite$;
-select n, test, expect, ok, note from vc_sec order by ok, n;
+revoke all on function vc_tests.security_suite() from public;
+
+select num, test_name, expected, passed, detail from vc_tests.security_suite() order by passed, num;
