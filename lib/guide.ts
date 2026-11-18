@@ -11,10 +11,12 @@ interface Entry { q: string; a: string; keys: string[] }
 
 const HELP: Record<Area, Entry[]> = {
   general: [
+    { q: 'I forgot my sign-in password', a: 'On the sign-in screen, type your email and choose "Forgot your password?". We email you a link to choose a new one. Your passphrase does not change.', keys: ['password', 'forgot', 'reset', 'sign in', 'email'] },
+    { q: 'How do I leave a community?', a: 'Go to Organisations and choose Leave. You stop seeing its stories and chats straight away. Download anything you want to keep first, from the Me screen. You can ask to join again later.', keys: ['leave', 'quit', 'exit', 'organisation', 'rejoin', 'join again'] },
     { q: 'Who can read my stories?', a: 'Only the people you choose. Your story is locked on your phone before it is saved. Each person you share with gets their own copy of the key. The administrator, First Geospatial and the server never get a key, so they cannot read it.', keys: ['who', 'read', 'see', 'private', 'admin', 'server'] },
     { q: 'What happens if I lose my phone?', a: 'Your stories are not on the phone in readable form. Sign in on a new phone and use your recovery card. If you still know your passphrase you can make a new card on the Me screen. If you have lost both, there is no way back in yet: in-person recovery with Recovery Keepers is planned but not built.', keys: ['lose', 'lost', 'phone', 'recovery', 'card', 'forgot'] },
     { q: 'What does Lock do?', a: 'Lock closes your private space on this device straight away, like locking the door when you leave a room. Use it on a shared phone or computer. Nothing is deleted. Type your passphrase to open it again. The app also locks itself after a few minutes without use.', keys: ['lock', 'locked', 'unlock', 'passphrase', 'why'] },
-    { q: 'Where is my data stored?', a: 'Your community chooses: an Australian-owned data centre, a local server at your community, or both. In this demo, invented data is stored in a cloud sandbox.', keys: ['where', 'stored', 'store', 'server', 'cloud', 'australia'] },
+    { q: 'Where is my data stored?', a: 'For real use, your community will choose: an Australian-owned data centre, a local server at your community, or both. This demo is a cloud sandbox with the database in Sydney, for invented material only.', keys: ['where', 'stored', 'store', 'server', 'cloud', 'australia'] },
   ],
   home: [
     { q: 'Where do I start?', a: 'Tap Record to save something new, Stories to see what has been shared with you, or Map to find things by place.', keys: ['start', 'begin', 'first'] },
@@ -31,6 +33,7 @@ const HELP: Record<Area, Entry[]> = {
     { q: 'What does "Update access" mean?', a: 'When people join or leave, the holder updates access so new members get keys and removed members lose them.', keys: ['update', 'access', 'rekey', 'join', 'leave'] },
   ],
   story: [
+    { q: 'How do I delete something?', a: 'Open it and choose Delete this item under Holder tools. The words, files and every key are erased for everyone, and any legacy wish for it is cancelled. It cannot be undone, so download a copy first if you want one.', keys: ['delete', 'remove', 'erase', 'get rid'] },
     { q: 'How do I pause a story for sorry business?', a: 'If you hold the story, tap Pause. It is re-locked under a new key that only you hold. Nobody else can open it until you lift the pause.', keys: ['pause', 'sorry', 'business', 'passed'] },
     { q: 'How do I make a public summary?', a: 'If you hold the story and consent includes public use, tap Prepare public summary. A Cultural Authority must sign it before it appears publicly. The location is blurred.', keys: ['public', 'summary', 'release', 'share'] },
     { q: 'What does "signature checked" mean?', a: "The app checked the holder's digital signature, so the story has not been changed by anyone else.", keys: ['signature', 'signed', 'checked', 'tamper'] },
@@ -48,6 +51,9 @@ const HELP: Record<Area, Entry[]> = {
     { q: 'Can a release be taken back?', a: 'Yes. The holder or a Cultural Authority can withdraw it at any time.', keys: ['withdraw', 'remove', 'take', 'back'] },
   ],
   community: [
+    { q: 'What are groups for?', a: 'A holder can share an item with a group, such as a family or the rangers. Only people in the group get a key. Administrators add and take people out of groups, and every change is in the governance log.', keys: ['group', 'family', 'rangers', 'school'] },
+    { q: 'How do I check someone is really who they say?', a: 'Meet them face to face. Each of you opens Community, finds the other person and taps Check safety code. If the six words on your screen match the six words on their Me screen, nobody has swapped their key.', keys: ['safety', 'code', 'check', 'verify', 'real', 'swapped', 'key changed'] },
+    { q: 'What does content keys mean?', a: 'People with content keys can be given stories. Someone who runs the organisation but should not open stories can have no content keys. Another administrator changes this. Nobody can change their own.', keys: ['content keys', 'content', 'no content'] },
     { q: 'How do I confirm someone as a woman or man?', a: 'Only Cultural Authorities can do this. Their confirmation is digitally signed, so nobody else can fake it.', keys: ['confirm', 'women', 'men', 'standing', 'attest'] },
     { q: 'What is the governance log?', a: 'A record of actions, such as members approved or stories paused, linked in a chain so any change to it can be detected. It never contains content.', keys: ['log', 'governance', 'audit', 'chain'] },
   ],
@@ -62,6 +68,8 @@ const HELP: Record<Area, Entry[]> = {
     { q: 'Can I get notifications by email or on my phone?', a: 'Not yet in the demo. Email and phone alerts are planned. They will only say that something needs you, never what a story says.', keys: ['email', 'push', 'phone', 'alert'] },
   ],
   me: [
+    { q: 'How do I change my passphrase?', a: 'On the Me screen choose Change passphrase. Type your current passphrase, then the new one twice.', keys: ['change', 'passphrase', 'new passphrase'] },
+    { q: 'I lost my recovery card', a: 'If you still know your passphrase, choose Make a new recovery card on the Me screen. Your old card stops working straight away. Print or write down the new one.', keys: ['lost', 'card', 'recovery', 'new card'] },
     { q: 'What is my safety code?', a: 'Six words made from your security key. Compare them face to face with someone to check you each have the right key.', keys: ['safety', 'code', 'words', 'key'] },
     { q: 'Can I download my data?', a: 'Yes. Tap Download my data to save everything you hold, decrypted, to your own device.', keys: ['download', 'export', 'data', 'leave'] },
   ],

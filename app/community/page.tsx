@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { auditCsv, issueAttestation, loadAudit, revokeAttestations, setAdmin, verifyChain, type AuditRow } from '@/lib/data';
 import { friendly } from '@/lib/errors';
 import GroupsAdmin from '@/components/GroupsAdmin';
+import SafetyCheck from '@/components/SafetyCheck';
 import { supabase } from '@/lib/supabase';
 import type { Attestation } from '@/lib/model';
 
@@ -159,6 +160,7 @@ export default function Community() {
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  {!me && m.status === 'active' && <SafetyCheck name={m.display_name.split(' (')[0]} signPk={m.sign_pk} encPk={m.enc_pk} />}
                   {isAdmin && m.status === 'pending' && <button className="btn btn-gold !min-h-10" onClick={() => setStatus(m.user_id, 'active')}>Approve</button>}
                   {isAdmin && m.status === 'active' && !m.is_admin && (
                     <button className="btn btn-line !min-h-10" onClick={() => { if (confirm(`Make ${m.display_name.split(' (')[0]} an administrator of ${org.name}?\n\nAdministrators approve and remove members, run bridges to other organisations and change settings. They cannot see anyone's stories.`)) run(() => setAdmin(org.id, m.user_id, true), `${m.display_name.split(' (')[0]} is now an administrator. This is recorded in the governance log.`); }}>Make administrator</button>
