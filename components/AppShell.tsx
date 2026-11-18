@@ -108,6 +108,7 @@ function Shell({ children }: { children: React.ReactNode }) {
               <Icon name="bell" />
               {notes.length > 0 && <span className="absolute top-0.5 right-0.5 bg-gold text-ink rounded-full text-[10px] font-bold min-w-4 h-4 px-1 flex items-center justify-center">{notes.length}</span>}
             </Link>
+            <Link href="/organisations" className="hidden lg:flex items-center p-2 text-white/85 hover:text-gold" title="Organisations" aria-label="Organisations"><Icon name="orgs" className="w-5 h-5" /></Link>
             <Link href="/me" className="hidden sm:flex items-center gap-1 text-white/70 hover:text-white text-sm px-1" title="Your account">
               <Icon name="me" className="w-5 h-5" /><span className="hidden md:inline max-w-[9rem] truncate">{displayName.split(' (')[0]}</span>
             </Link>

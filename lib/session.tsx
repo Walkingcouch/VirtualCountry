@@ -140,7 +140,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     if (orgId) try { localStorage.setItem('vc-org', orgId); } catch { /* ignore */ }
   }, [status, orgId, refresh]);
 
-  const lock = useCallback(() => { setKeysState(null); setStatus((s) => (s === 'ready' ? 'locked' : s)); }, []);
+  const lockHere = useCallback(() => { setKeysState(null); setStatus((s) => (s === 'ready' ? 'locked' : s)); }, []);
+  // Every open tab locks and signs out together, so a forgotten second tab never stays open.
+  const channel = useRef<BroadcastChannel | null>(null);
+  useEffect(() => {
+    if (typeof BroadcastChannel === 'undefined') return;
+    const ch = new BroadcastChannel('vc-session');
+    ch.onmessage = (e: MessageEvent<string>) => { if (e.data === 'lock') lockHere(); };
+    channel.current = ch;
+    return () => { ch.close(); channel.current = null; };
+  }, [lockHere]);
+  const lock = useCallback(() => { lockHere(); channel.current?.postMessage('lock'); }, [lockHere]);
 
   // Auto-lock after inactivity (E5)
   useEffect(() => {
@@ -149,17 +159,29 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (idleTimer.current) clearTimeout(idleTimer.current);
       idleTimer.current = setTimeout(lock, idleMinutes * 60 * 1000);
     };
+    // Timers can stall while a phone sleeps, so the time of the last activity is also checked whenever the app comes back into view.
+    let last = Date.now();
+    const touch = () => { last = Date.now(); reset(); };
+    const back = () => { if (document.visibilityState === 'visible' && Date.now() - last >= idleMinutes * 60 * 1000) lock(); };
     const events = ['pointerdown', 'keydown', 'scroll', 'touchstart'];
-    events.forEach((e) => window.addEventListener(e, reset, { passive: true }));
+    events.forEach((e) => window.addEventListener(e, touch, { passive: true }));
+    document.addEventListener('visibilitychange', back);
     reset();
     return () => {
-      events.forEach((e) => window.removeEventListener(e, reset));
+      events.forEach((e) => window.removeEventListener(e, touch));
+      document.removeEventListener('visibilitychange', back);
       if (idleTimer.current) clearTimeout(idleTimer.current);
     };
   }, [status, idleMinutes, lock]);
 
   const setKeys = useCallback((k: IdentityKeys) => { setKeysState(k); setStatus('ready'); }, []);
-  const signOut = useCallback(async () => { setKeysState(null); setDir(null); await supabase().auth.signOut(); setStatus('signed_out'); }, []);
+  const signOut = useCallback(async () => {
+    setKeysState(null); setDir(null);
+    channel.current?.postMessage('lock');
+    try { localStorage.removeItem('vc-org'); } catch { /* storage unavailable */ }
+    await supabase().auth.signOut();
+    setStatus('signed_out');
+  }, []);
   const nameOf = useCallback((id: string | null | undefined) => {
     if (!id) return 'Unknown';
     if (id === userId) return displayName || 'Me';
