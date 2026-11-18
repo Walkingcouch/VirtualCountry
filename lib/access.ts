@@ -19,7 +19,23 @@ export interface Directory {
  * Same rule as the database (vc_ca_set): appointments are read in the order they were signed. While the founding
  * Cultural Authority is the only one, they can appoint the second alone. After that, two Cultural Authorities must sign.
  */
-export async function caState(dir: Directory): Promise<{ cas: Set<string>; pending: Map<string, string[]>; valid: Attestation[] }> {
+export interface CaState { cas: Set<string>; pending: Map<string, string[]>; valid: Attestation[] }
+
+// Checking every signature is the slowest part of opening a community. A directory is never changed after it is loaded,
+// so the result is worked out once per directory and reused by every screen and every save.
+const caCache = new WeakMap<Directory, Promise<CaState>>();
+
+export function caState(dir: Directory): Promise<CaState> {
+  let p = caCache.get(dir);
+  if (!p) {
+    p = computeCaState(dir);
+    caCache.set(dir, p);
+    p.catch(() => caCache.delete(dir));
+  }
+  return p;
+}
+
+async function computeCaState(dir: Directory): Promise<CaState> {
   const byId = new Map(dir.members.map((m) => [m.user_id, m]));
   const live = dir.attestations.filter((a) => !a.revoked_at);
   const sigOk = async (a: Attestation) => {

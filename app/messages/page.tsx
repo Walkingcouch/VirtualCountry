@@ -91,6 +91,7 @@ export default function Messages() {
   useEffect(() => {
     if (!active || !keys || !userId) return;
     const t = setInterval(async () => {
+      if (document.visibilityState !== 'visible') return;
       try {
         const list = await loadMessages(active, keys, userId, signKeys);
         setMsgs((old) => (old.length === list.length ? old : list));

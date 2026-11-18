@@ -23,10 +23,13 @@ export function NotesProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     reload();
-    const t = setInterval(reload, 45000);
+    // Check every 45 seconds while the app is on screen, and straight away when it comes back. Nothing runs while it is hidden.
+    const t = setInterval(() => { if (document.visibilityState === 'visible') reload(); }, 45000);
     const onRead = () => reload();
+    const onShow = () => { if (document.visibilityState === 'visible') reload(); };
     window.addEventListener('vc-read', onRead);
-    return () => { clearInterval(t); window.removeEventListener('vc-read', onRead); };
+    document.addEventListener('visibilitychange', onShow);
+    return () => { clearInterval(t); window.removeEventListener('vc-read', onRead); document.removeEventListener('visibilitychange', onShow); };
   }, [reload]);
 
   return <Ctx.Provider value={{ notes, reload }}>{children}</Ctx.Provider>;
