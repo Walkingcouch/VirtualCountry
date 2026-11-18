@@ -54,7 +54,7 @@ export default function AccountSecurity() {
       {card && (
         <div className="mb-4 border border-gold rounded p-4" role="status">
           <p className="text-sm mb-2"><strong>Your new recovery card.</strong> Print it or write it down now. It is shown once, and your old card no longer works.</p>
-          <div className="bg-ink text-white rounded p-4 font-mono text-lg tracking-wider text-center select-all break-all">{card}</div>
+          <div className="print-card bg-ink text-white rounded p-4 font-mono text-lg tracking-wider text-center select-all break-all">{card}</div>
           <div className="flex flex-wrap gap-2 mt-3">
             <button className="btn btn-line" onClick={() => window.print()}>Print</button>
             <button className="btn btn-ink" onClick={() => setCard('')}>I have saved it</button>

@@ -1,6 +1,7 @@
 'use client';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { useOnline } from '@/lib/online';
 import { useSession } from '@/lib/session';
 import { useItems } from '@/lib/items-context';
 import { saveItemVersion, uploadMedia } from '@/lib/data';
@@ -30,6 +31,7 @@ export default function Record() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const recorder = useRef<MediaRecorder | null>(null);
+  const online = useOnline();
   const [saved, setSaved] = useState(false);
   const dirty = !saved && (title.trim() !== '' || body.trim() !== '' || files.length > 0);
 
@@ -172,7 +174,8 @@ export default function Record() {
           <h2 className="font-head font-semibold mb-1">Lock and save</h2>
           <p className="text-xs text-mute">It is locked on this device first. Only the people listed above receive a key. You can change this later.</p>
           {err && <p className="text-danger text-sm mt-3">{err}</p>}
-          <button className="btn btn-gold w-full mt-4" disabled={busy || !title.trim()} onClick={save}>{busy ? 'Locking and saving…' : 'Lock and save'}</button>
+          <button className="btn btn-gold w-full mt-4" disabled={busy || !title.trim() || !online} onClick={save}>{busy ? 'Locking and saving…' : 'Lock and save'}</button>
+          {!online && <p className="text-sm text-mute mt-2" role="status">You are offline. Keep this screen open and save when the connection is back. Nothing is lost while you wait.</p>}
         </div>
       </aside>
     </div>

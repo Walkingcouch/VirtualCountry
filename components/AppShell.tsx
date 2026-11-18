@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSession } from '@/lib/session';
 import { ItemsProvider, useItems } from '@/lib/items-context';
 import { NotesProvider, useNotes } from '@/lib/notes-context';
@@ -9,6 +9,7 @@ import Unlock from '@/components/Unlock';
 import Guide, { openGuide } from '@/components/Guide';
 import Logo from '@/components/Logo';
 import Icon from '@/components/Icon';
+import { useOnline } from '@/lib/online';
 import type { Area } from '@/lib/guide';
 
 const MAIN = [
@@ -44,19 +45,6 @@ function areaOf(path: string): Area {
   return (['record', 'stories', 'map', 'messages', 'releases', 'community', 'me', 'legacy', 'notifications'] as Area[]).includes(seg) ? seg : 'general';
 }
 
-/** True while the browser reports a connection. */
-function useOnline() {
-  const [online, setOnline] = useState(true);
-  useEffect(() => {
-    const sync = () => setOnline(navigator.onLine);
-    sync();
-    window.addEventListener('online', sync);
-    window.addEventListener('offline', sync);
-    return () => { window.removeEventListener('online', sync); window.removeEventListener('offline', sync); };
-  }, []);
-  return online;
-}
-
 /** Screens that still make sense before a person belongs to a community. */
 const NO_ORG_PAGES = ['/', '/organisations', '/me', '/notifications', '/privacy', '/terms', '/icip', '/contact'];
 
@@ -76,7 +64,14 @@ function Shell({ children }: { children: React.ReactNode }) {
   const unreadMessages = notes.filter((n) => n.kind === 'message').length;
   const moreCount = notes.filter((n) => n.kind !== 'message').length;
 
-  useEffect(() => { setMore(false); }, [path]);
+  // Move focus to the new screen so screen readers announce it, the way a full page load would.
+  const firstPath = useRef(path);
+  useEffect(() => {
+    setMore(false);
+    if (path === firstPath.current) return;
+    firstPath.current = path;
+    document.getElementById('main')?.focus({ preventScroll: true });
+  }, [path]);
 
   return (
     <div className="min-h-screen pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-10">
@@ -151,6 +146,7 @@ function Shell({ children }: { children: React.ReactNode }) {
         <Link className="underline" href="/terms">Terms of use</Link>
         <Link className="underline" href="/icip">ICIP statement</Link>
         <Link className="underline" href="/contact">Contact</Link>
+        <span className="ml-auto">Version {process.env.NEXT_PUBLIC_APP_VERSION}</span>
       </footer>
 
       {more && (

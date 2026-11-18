@@ -67,3 +67,11 @@ button:disabled, .btn[disabled] { cursor: not-allowed; }
 .legal ul { list-style: disc; padding-left: 1.25rem; }
 .legal li { margin: .25rem 0; }
 .legal a { text-decoration: underline; }
+
+/* Printing the recovery card prints the card alone. */
+@media print {
+  body * { visibility: hidden; }
+  .print-card, .print-card * { visibility: visible; }
+  .print-card { position: absolute; inset: 0 auto auto 0; width: 100%; color: #000 !important; background: #fff !important; font-size: 22pt; padding: 24pt; }
+  .print-card::before { content: "Virtual Country recovery card. Keep it somewhere safe. Anyone with this card and your sign-in can open your private space."; display: block; font: 11pt system-ui, sans-serif; margin-bottom: 12pt; }
+}

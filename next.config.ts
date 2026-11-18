@@ -2,7 +2,10 @@ import type { NextConfig } from 'next';
 
 // The Content-Security-Policy header is set per request in proxy.ts, with a fresh nonce each time.
 
+import pkg from './package.json';
+
 const nextConfig: NextConfig = {
+  env: { NEXT_PUBLIC_APP_VERSION: pkg.version },
   reactStrictMode: true,
   poweredByHeader: false,
   async headers() {

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from '@/lib/session';
 import { acceptBridge, allOrgs, bridgeAction, bridgePeople, conversationActivity, createConversation, listBridges, listConversations, loadMessages, membersOf, requestBridge, sendMessage, type BridgeInfo, type ChatMessage, type Conversation, shareMissingKeys } from '@/lib/data';
 import { friendly } from '@/lib/errors';
+import { useOnline } from '@/lib/online';
 import { markRead, readMap } from '@/lib/notifications';
 import { supabase } from '@/lib/supabase';
 
@@ -45,6 +46,7 @@ export default function Messages() {
   const [outsider, setOutsider] = useState('');
   const [signKeys, setSignKeys] = useState<Map<string, string>>(new Map());
   const scroller = useRef<HTMLDivElement>(null);
+  const online = useOnline();
   const atBottom = useRef(true);
 
   const refresh = useCallback(async () => {
@@ -365,7 +367,7 @@ export default function Messages() {
               ) : (
               <form className="p-3 border-t border-line flex gap-2 bg-paper pb-[calc(.75rem+env(safe-area-inset-bottom))]" onSubmit={(e) => { e.preventDefault(); send(); }}>
                 <input className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder="Write a message" aria-label="Message" maxLength={4000} />
-                <button className="btn btn-gold">Send</button>
+                <button className="btn btn-gold" disabled={!online || !text.trim()} title={online ? undefined : 'You are offline'}>Send</button>
               </form>
               )}
             </>

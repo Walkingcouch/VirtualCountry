@@ -97,7 +97,7 @@ export default function Setup() {
           <>
             <h1 className="font-head font-extrabold text-3xl mb-3">YOUR RECOVERY <span className="text-gold">CARD</span></h1>
             <p className="text-white/75 mb-4">Print this or write it down and keep it somewhere safe. It is the only way back in if you forget your passphrase. Without the passphrase or this card, nobody can open your things, including First Geospatial.</p>
-            <div className="bg-white text-ink rounded p-5 font-mono text-xl tracking-wider text-center select-all">{code}</div>
+            <div className="print-card bg-white text-ink rounded p-5 font-mono text-xl tracking-wider text-center select-all">{code}</div>
             <div className="flex gap-3 mt-4">
               <button className="btn btn-line" onClick={() => window.print()}>Print card</button>
             </div>
