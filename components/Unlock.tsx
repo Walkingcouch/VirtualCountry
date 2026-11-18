@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSession } from '@/lib/session';
 import { DEMO_MODE, DEMO_PASSPHRASE } from '@/lib/supabase';
 import { rewrapPassphrase, unlockWithPassphrase, unlockWithRecoveryCode } from '@/lib/vault';
@@ -14,9 +14,19 @@ export default function Unlock() {
   const [newPass, setNewPass] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  // After five wrong tries in a row, wait before trying again. This slows down someone guessing on this device.
+  const [fails, setFails] = useState(0);
+  const [waitUntil, setWaitUntil] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (waitUntil <= now) return;
+    const t = setTimeout(() => setNow(Date.now()), 1000);
+    return () => clearTimeout(t);
+  }, [waitUntil, now]);
+  const waiting = Math.max(0, Math.ceil((waitUntil - now) / 1000));
 
   const go = async () => {
-    if (!vault) return;
+    if (!vault || waiting > 0) return;
     setBusy(true); setErr('');
     try {
       if (mode === 'pass') {
@@ -29,6 +39,9 @@ export default function Unlock() {
         setKeys(keys);
       }
     } catch (e) {
+      const n = fails + 1;
+      setFails(n);
+      if (n >= 5) { const until = Date.now() + Math.min(300, 30 * 2 ** (n - 5)) * 1000; setWaitUntil(until); setNow(Date.now()); }
       setErr(mode === 'pass' ? 'That passphrase did not work. Check it and try again.' : (e as Error).message.startsWith('short:') ? (e as Error).message.slice(6) : typeof navigator !== 'undefined' && !navigator.onLine ? 'You are offline. Connect and try again.' : 'That recovery code did not work.');
     } finally { setBusy(false); }
   };
@@ -54,7 +67,7 @@ export default function Unlock() {
             </>
           )}
           {err && <p className="text-[#F3B0A8] text-sm" role="alert">{err}</p>}
-          <button className="btn btn-gold w-full" disabled={busy}>{busy ? 'Opening…' : 'Open'}</button>
+          <button className="btn btn-gold w-full" disabled={busy || waiting > 0}>{busy ? 'Opening…' : waiting > 0 ? `Wait ${waiting} seconds` : 'Open'}</button>
         </form>
         {process.env.NEXT_PUBLIC_DEMO_MODE === 'true' && mode === 'pass' && <p className="text-white/50 text-xs mt-3">Demo passphrase: {DEMO_PASSPHRASE}</p>}
         <div className="flex justify-between mt-6 text-sm">

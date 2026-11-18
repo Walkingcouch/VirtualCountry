@@ -27,8 +27,14 @@ export async function unlockWithPassphrase(vault: VaultRow, passphrase: string):
   return openIdentity(amk, vault.identity);
 }
 
+/** People type the card with or without dashes, spaces or lower case. The stored form is six groups of four, upper case. */
+export function normaliseRecoveryCode(code: string): string {
+  const raw = code.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return (raw.match(/.{1,4}/g) ?? []).join('-');
+}
+
 export async function unlockWithRecoveryCode(vault: VaultRow, code: string): Promise<{ keys: c.IdentityKeys; amk: Uint8Array }> {
-  const amk = await c.unwrapWithPassphrase(vault.amk_recovery, code.trim().toUpperCase());
+  const amk = await c.unwrapWithPassphrase(vault.amk_recovery, normaliseRecoveryCode(code));
   return { keys: await openIdentity(amk, vault.identity), amk };
 }
 

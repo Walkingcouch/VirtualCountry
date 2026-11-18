@@ -25,3 +25,14 @@ describe('passphrase rules', () => {
     expect(checkPassphrase('country-demo').ok).toBe(true);
   });
 });
+
+import { normaliseRecoveryCode } from '../lib/vault';
+describe('recovery card input', () => {
+  it('accepts the card typed with spaces, without dashes or in lower case', () => {
+    const card = 'K7QM-2XRA-LMNP-QRST-UVWX-YZ23';
+    expect(normaliseRecoveryCode(card)).toBe(card);
+    expect(normaliseRecoveryCode('k7qm 2xra lmnp qrst uvwx yz23')).toBe(card);
+    expect(normaliseRecoveryCode('K7QM2XRALMNPQRSTUVWXYZ23')).toBe(card);
+    expect(normaliseRecoveryCode('  k7qm-2xra-lmnp-qrst-uvwx-yz23\n')).toBe(card);
+  });
+});
