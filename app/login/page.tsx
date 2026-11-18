@@ -44,10 +44,22 @@ export default function Login() {
     } finally { setBusy(null); }
   };
 
+  const forgot = async () => {
+    setMsg(''); setOk('');
+    if (!email.trim()) return setMsg('Type your email address first, then choose "Forgot your password?".');
+    setBusy('forgot');
+    try {
+      const { error } = await supabase().auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/reset` });
+      if (error) throw error;
+      setOk(`If there is an account for ${email.trim()}, we have sent it a link to choose a new password.`);
+    } catch (err) { setMsg(friendly(err)); } finally { setBusy(null); }
+  };
+
   const submit = async () => {
     setBusy('form'); setMsg(''); setOk('');
     try {
       if (mode === 'signup' && password !== password2) throw new Error('The two passwords do not match.');
+      if (mode === 'signup' && password.length < 12) throw new Error('Use a password of at least 12 characters.');
       if (mode === 'signin') {
         await signIn(email, password);
         await refresh();
@@ -79,6 +91,7 @@ export default function Login() {
               <input className="input !text-text" type="password" autoComplete="new-password" value={password2} onChange={(e) => setPassword2(e.target.value)} placeholder="Confirm password" aria-label="Confirm password" required minLength={8} />
             )}
             <button className="btn btn-gold w-full" disabled={!!busy}>{mode === 'signin' ? 'Sign in' : 'Create account'}</button>
+            {mode === 'signin' && <button type="button" className="text-sm underline text-white/70 block" onClick={forgot} disabled={!!busy}>Forgot your password?</button>}
             {ok && <p className="text-[#A8E6C1] text-sm" role="status">{ok}</p>}
             {msg && <p className="text-[#F3B0A8] text-sm" role="alert">{msg}</p>}
             <button type="button" className="text-sm underline text-white/70" onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setMsg(''); setOk(''); }}>
@@ -92,7 +105,7 @@ export default function Login() {
             <Link className="underline" href="/icip">ICIP statement</Link>
             <Link className="underline" href="/contact">Contact</Link>
           </p>
-          <p className="text-white/60 text-xs mt-6 max-w-sm">Production sign-in uses a one-time code or a passkey (face or fingerprint). Then your own passphrase unlocks your keys on your device. Your passphrase is never sent to the server.</p>
+          <p className="text-white/60 text-xs mt-6 max-w-sm">Your password signs you in. Then your own passphrase unlocks your keys on your device. One-time codes and passkeys (face or fingerprint) are planned. Your passphrase is never sent to the server.</p>
         </section>
 
         {process.env.NEXT_PUBLIC_DEMO_MODE === 'true' && (

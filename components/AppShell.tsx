@@ -60,13 +60,13 @@ function useOnline() {
 /** Screens that still make sense before a person belongs to a community. */
 const NO_ORG_PAGES = ['/', '/organisations', '/me', '/notifications', '/privacy', '/terms', '/icip', '/contact'];
 
-const PUBLIC_PAGES = ['/login', '/setup', '/public', '/privacy', '/terms', '/icip', '/contact'];
+const PUBLIC_PAGES = ['/login', '/setup', '/reset', '/public', '/privacy', '/terms', '/icip', '/contact'];
 
 const isActive = (path: string, href: string) => (href === '/' ? path === '/' : path === href || path.startsWith(href + '/'));
 
 function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
-  const { org, orgs, setOrgId, lock, keyAlerts, displayName, loadError, refresh } = useSession();
+  const { org, orgs, setOrgId, lock, keyAlerts, displayName, loadError, refresh, guideOn } = useSession();
   const { deny, error: itemsError, reload } = useItems();
   const online = useOnline();
   const problem = loadError || itemsError;
@@ -103,7 +103,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             ))}
           </nav>
           <div className="ml-auto lg:ml-3 flex items-center gap-1 sm:gap-2">
-            <button onClick={openGuide} className="lg:hidden p-2 text-white/85 hover:text-gold" aria-label="Open the Guide (help)"><Icon name="help" /></button>
+            {guideOn && <button onClick={openGuide} className="lg:hidden p-2 text-white/85 hover:text-gold" aria-label="Open the Guide (help)"><Icon name="help" /></button>}
             <Link href="/notifications" className="relative p-2 text-white/85 hover:text-gold" aria-label={`Notifications${notes.length ? `, ${notes.length} new` : ''}`}>
               <Icon name="bell" />
               {notes.length > 0 && <span className="absolute top-0.5 right-0.5 bg-gold text-ink rounded-full text-[10px] font-bold min-w-4 h-4 px-1 flex items-center justify-center">{notes.length}</span>}
@@ -181,7 +181,7 @@ function Shell({ children }: { children: React.ReactNode }) {
           {moreCount > 0 && <span className="absolute top-2 left-1/2 ml-2 bg-gold text-ink rounded-full text-[10px] font-bold min-w-4 h-4 px-1 flex items-center justify-center">{moreCount}</span>}
         </button>
       </nav>
-      <Guide area={areaOf(path)} deny={deny} />
+      {guideOn && <Guide area={areaOf(path)} deny={deny} />}
     </div>
   );
 }

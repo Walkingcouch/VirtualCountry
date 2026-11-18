@@ -76,7 +76,7 @@ export default function Setup() {
             <h1 className="font-head font-extrabold text-3xl mb-3">CHOOSE YOUR <span className="text-gold">PASSPHRASE</span></h1>
             <p className="text-white/75 mb-5">Your passphrase is like the key to your own locked room. It opens everything you keep here, on this device. Nobody else sees it, not even First Geospatial, so nobody can reset it for you. Next you will get a recovery card in case you forget it.</p>
             <div className="space-y-3">
-              <input className="input !text-text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name as the community knows you" aria-label="Display name" />
+              <input className="input !text-text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name as the community knows you" aria-label="Display name" maxLength={80} />
               <input className="input !text-text" type={show ? 'text' : 'password'} autoComplete="new-password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder="Choose a passphrase (12 characters or more)" aria-label="Passphrase" aria-describedby="pass-hint" />
               {pass && (
                 <div id="pass-hint" aria-live="polite">

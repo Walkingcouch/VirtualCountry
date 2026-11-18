@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSession } from '@/lib/session';
 import { useItems } from '@/lib/items-context';
 import { blurPoint, deleteItem, draftRelease, openMedia, saveItemVersion } from '@/lib/data';
@@ -19,7 +19,7 @@ export default function Story() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const { userId, keys, org, dir, nameOf } = useSession();
+  const { userId, keys, org, dir, nameOf, blurPercent } = useSession();
   const { items, loading, reload } = useItems();
   const it = items.find((x) => x.row.id === id);
   const [accepted, setAccepted] = useState(false);
@@ -44,6 +44,10 @@ export default function Story() {
   const [wishes, setWishes] = useState<LegacyView[]>([]);
 
   useEffect(() => { setAccepted(false); setEditAccess(null); setLegacyForm(false); }, [id]);
+  // Unlocked files live in memory only while this item is open.
+  const mediaRef = useRef(media);
+  mediaRef.current = media;
+  useEffect(() => () => { Object.values(mediaRef.current).forEach((u) => URL.revokeObjectURL(u)); }, [id]);
 
   const loadWishes = useCallback(async () => {
     if (!keys || !userId || !org) return;
@@ -74,7 +78,7 @@ export default function Story() {
   const p = it.payload;
   const holder = it.row.holder_id === userId;
   const needsWarning = p.restrictions.deceased && !accepted;
-  const blur = p.place ? blurPoint(p.place.x, p.place.y, 10) : null;
+  const blur = p.place ? blurPoint(p.place.x, p.place.y, blurPercent) : null;
 
   const newVersion = async (paused: boolean) => {
     if (!keys || !userId || !org || !dir) return;
@@ -131,7 +135,9 @@ export default function Story() {
 
   const download = () => {
     const blob = new Blob([JSON.stringify({ item: it.row, payload: p, recipients: it.recipients.map((r) => nameOf(r)) }, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${p.title.replace(/[^a-z0-9]+/gi, '-')}.json`; a.click();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `${p.title.replace(/[^a-z0-9]+/gi, '-')}.json`; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   const canRelease = holder && !it.row.paused && !p.restrictions.sacred && !p.restrictions.gender && p.consent.uses.public === 'yes';
@@ -294,9 +300,9 @@ export default function Story() {
           <div className="card p-5 space-y-2 border-gold">
             <h2 className="font-head font-semibold">Public summary</h2>
             <p className="text-xs text-mute">Write a short summary for the public. The original stays private. The location is generalised to the shaded square.</p>
-            <input className="input" value={rel.title} onChange={(e) => setRel({ ...rel, title: e.target.value })} aria-label="Summary title" />
-            <textarea className="textarea" value={rel.summary} onChange={(e) => setRel({ ...rel, summary: e.target.value })} placeholder="What can be shared publicly" aria-label="Summary" />
-            {blur && <DemoMap blurCell={{ ...blur, size: 100 }} height={220} />}
+            <input className="input" value={rel.title} onChange={(e) => setRel({ ...rel, title: e.target.value })} aria-label="Summary title" maxLength={140} />
+            <textarea className="textarea" value={rel.summary} onChange={(e) => setRel({ ...rel, summary: e.target.value })} placeholder="What can be shared publicly" aria-label="Summary" maxLength={4000} />
+            {blur && <DemoMap blurCell={{ ...blur, size: Math.max(20, Math.round(10 * blurPercent)) }} height={220} />}
             <div className="flex gap-2">
               <button className="btn btn-gold flex-1" onClick={submitRelease} disabled={!rel.summary.trim() || busy === 'release'}>Send for sign-off</button>
               <button className="btn btn-line" onClick={() => setRel(null)}>Cancel</button>

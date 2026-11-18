@@ -45,7 +45,7 @@ export default function Community() {
   const { org, dir, userId, keys, cas, caPending, standing, nameOf, refresh } = useSession();
   const [audit, setAudit] = useState<AuditRow[]>([]);
   const [chain, setChain] = useState<{ ok: boolean; entries: number; head: string } | null>(null);
-  const [settings, setSettings] = useState<{ ai_help: boolean; idle_lock_minutes: number } | null>(null);
+  const [settings, setSettings] = useState<{ ai_help: boolean; idle_lock_minutes: number; public_blur_percent: number } | null>(null);
   const [msg, setMsg] = useState('');
   const [open, setOpen] = useState<number | null>(null);
   const [filter, setFilter] = useState<'all' | 'people' | 'items' | 'legacy' | 'releases' | 'bridges'>('all');
@@ -57,7 +57,7 @@ export default function Community() {
     if (!org) return;
     setAudit(await loadAudit(org.id));
     setChain(await verifyChain(org.id));
-    const s = await supabase().from('org_settings').select('ai_help, idle_lock_minutes').eq('org_id', org.id).maybeSingle();
+    const s = await supabase().from('org_settings').select('ai_help, idle_lock_minutes, public_blur_percent').eq('org_id', org.id).maybeSingle();
     setSettings(s.data);
   }, [org]);
   useEffect(() => { load().catch((e) => setMsg(friendly(e))); }, [load]);
@@ -102,7 +102,7 @@ export default function Community() {
     } catch (e) { setMsg(friendly(e)); } finally { setExporting(false); }
   };
 
-  const saveSettings = (patch: Partial<{ ai_help: boolean; idle_lock_minutes: number }>) => run(async () => {
+  const saveSettings = (patch: Partial<{ ai_help: boolean; idle_lock_minutes: number; public_blur_percent: number }>) => run(async () => {
     const { error } = await supabase().from('org_settings').update(patch).eq('org_id', org!.id);
     if (error) throw error;
   }, 'Settings saved and logged.');
@@ -205,7 +205,12 @@ export default function Community() {
         <section>
           <h2 className="font-head font-semibold text-lg mb-3">Settings (administrator)</h2>
           <div className="card p-4 grid sm:grid-cols-2 gap-4">
-            <label className="flex items-center justify-between gap-3"><span>AI Guide (help mode) for everyone</span><input type="checkbox" checked={settings.ai_help} onChange={(e) => saveSettings({ ai_help: e.target.checked })} /></label>
+            <label className="flex items-center justify-between gap-3"><span>Show the Guide (built-in help) to everyone</span><input type="checkbox" checked={settings.ai_help} onChange={(e) => saveSettings({ ai_help: e.target.checked })} /></label>
+            <label className="flex items-center justify-between gap-3"><span>Public places are shown within a square of about</span>
+              <select className="select !w-32" aria-label="How much public places are generalised" value={settings.public_blur_percent} onChange={(e) => saveSettings({ public_blur_percent: Number(e.target.value) })}>
+                {[5, 10, 20, 30, 50].map((n) => <option key={n} value={n}>{n}% of the map</option>)}
+              </select>
+            </label>
             <label className="flex items-center justify-between gap-3"><span>Lock automatically after (minutes)</span>
               <select className="select !w-28" aria-label="Minutes before the app locks itself" value={settings.idle_lock_minutes} onChange={(e) => saveSettings({ idle_lock_minutes: Number(e.target.value) })}>{[2, 5, 10, 15, 30, 60].map((n) => <option key={n}>{n}</option>)}</select>
             </label>

@@ -28,6 +28,9 @@ interface SessionValue {
   standing: Map<string, Set<string>>;
   keyAlerts: string[];
   idleMinutes: number;
+  /** Community settings: whether the Guide is shown, and how much public places are generalised. */
+  guideOn: boolean;
+  blurPercent: number;
   /** Set when the community could not be loaded, so the screen can say so and offer a retry. */
   loadError: string;
   setKeys: (k: IdentityKeys) => void;
@@ -68,6 +71,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [standing, setStanding] = useState<Map<string, Set<string>>>(new Map());
   const [keyAlerts, setKeyAlerts] = useState<string[]>([]);
   const [idleMinutes, setIdleMinutes] = useState(10);
+  const [guideOn, setGuideOn] = useState(true);
+  const [blurPercent, setBlurPercent] = useState(10);
   const [loadError, setLoadError] = useState('');
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -115,8 +120,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setCas(ca.cas);
     setCaPending(ca.pending);
     setStanding(await standings(d));
-    const s = await supabase().from('org_settings').select('idle_lock_minutes').eq('org_id', current.id).maybeSingle();
-    if (s.data) setIdleMinutes(s.data.idle_lock_minutes);
+    const s = await supabase().from('org_settings').select('idle_lock_minutes, ai_help, public_blur_percent').eq('org_id', current.id).maybeSingle();
+    if (s.data) { setIdleMinutes(s.data.idle_lock_minutes); setGuideOn(s.data.ai_help); setBlurPercent(s.data.public_blur_percent); }
     // Key pinning (E5): warn when someone's security key changes
     const pins = readPins(userId);
     const alerts: string[] = [];
@@ -162,7 +167,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [dir, userId, displayName]);
 
   const value: SessionValue = {
-    status, userId, email, displayName, vault, keys, orgs, org, dir, cas, caPending, standing, keyAlerts, idleMinutes, loadError,
+    status, userId, email, displayName, vault, keys, orgs, org, dir, cas, caPending, standing, keyAlerts, idleMinutes, guideOn, blurPercent, loadError,
     setKeys, setOrgId: (id) => setOrgId(id), refresh: async () => { await loadUser(); await refresh(); }, lock, signOut, nameOf,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

@@ -354,7 +354,7 @@ export default function Messages() {
                 <p className="p-3 border-t border-line bg-paper text-sm text-mute pb-[calc(.75rem+env(safe-area-inset-bottom))]">This bridge is closed. Messages stay readable, but nobody can post.</p>
               ) : (
               <form className="p-3 border-t border-line flex gap-2 bg-paper pb-[calc(.75rem+env(safe-area-inset-bottom))]" onSubmit={(e) => { e.preventDefault(); send(); }}>
-                <input className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder="Write a message" aria-label="Message" />
+                <input className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder="Write a message" aria-label="Message" maxLength={4000} />
                 <button className="btn btn-gold">Send</button>
               </form>
               )}
@@ -381,7 +381,7 @@ export default function Messages() {
                 );
               })}
             </div>
-            {pick.length > 1 && <input className="input" placeholder={`Group name (optional, e.g. ${pick.map((u) => nameOf(u).split(' (')[0]).join(', ')})`} value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Group name" />}
+            {pick.length > 1 && <input className="input" maxLength={120} placeholder={`Group name (optional, e.g. ${pick.map((u) => nameOf(u).split(' (')[0]).join(', ')})`} value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Group name" />}
             {err && <p className="text-danger text-sm" role="alert">{err}</p>}
             <button className="btn btn-gold w-full" disabled={!pick.length || busy} onClick={create}>
               {busy ? 'Starting…' : pick.length > 1 ? `Start group with ${pick.length} people` : pick.length === 1 ? `Chat with ${nameOf(pick[0]).split(' (')[0]}` : 'Choose someone'}

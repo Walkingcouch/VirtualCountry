@@ -87,8 +87,8 @@ export default function Record() {
               <button key={k} onClick={() => setKind(k)} className={`chip !py-1.5 !px-3 ${kind === k ? '!bg-ink !text-white !border-ink' : ''}`}>{k}</button>
             ))}
           </div>
-          <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Short title" aria-label="Title" />
-          <textarea className="textarea" value={body} onChange={(e) => setBody(e.target.value)} placeholder="Type the story or notes here, or record audio below" aria-label="Story" />
+          <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Short title" aria-label="Title" maxLength={140} />
+          <textarea className="textarea" value={body} onChange={(e) => setBody(e.target.value)} placeholder="Type the story or notes here, or record audio below" aria-label="Story" maxLength={100000} />
           <div className="flex flex-wrap items-center gap-2">
             {!recording ? <button className="btn btn-ink" onClick={startRec}>● Record audio</button> : <button className="btn btn-danger" onClick={stopRec}>■ Stop</button>}
             <label className="btn btn-line">Add photo or file<input type="file" className="hidden" accept="image/*,audio/*,video/*,.pdf" onChange={(e) => { const f = e.target.files?.[0]; if (f) setFiles((x) => [...x, { blob: f, name: f.name }]); }} /></label>

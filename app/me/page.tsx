@@ -17,7 +17,9 @@ export default function Me() {
   const exportAll = () => {
     const data = items.map((i) => ({ id: i.row.id, holder: nameOf(i.row.holder_id), version: i.version, ...i.payload }));
     const blob = new Blob([JSON.stringify({ exported_at: new Date().toISOString(), person: displayName, community: org?.name, items: data }, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'virtual-country-my-data.json'; a.click();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'virtual-country-my-data.json'; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   return (
