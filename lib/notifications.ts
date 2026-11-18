@@ -71,6 +71,13 @@ export async function loadNotifications(args: {
       if (v.myRole === 'holder' && (itemVersions.get(v.row.item_id) ?? v.row.item_version) > v.row.item_version) {
         out.push({ id: `lg-refresh-${v.row.id}`, kind: 'legacy', text: `You changed "${title}". Refresh your legacy wish so it still works.`, href: `/stories/${v.row.item_id}` });
       }
+      if (v.myRole === 'holder' && v.wish) {
+        // Keepers who have left, or lost content keys, can no longer agree. If too few remain, the wish can never be carried out.
+        const able = v.wish.keeperIds.filter((k) => dir.members.some((m) => m.user_id === k && m.status === 'active' && m.content_member));
+        if (able.length < v.row.threshold) {
+          out.push({ id: `lg-keepers-${v.row.id}`, kind: 'legacy', text: `Only ${able.length} of the keepers for "${title}" are still in the community, and ${v.row.threshold} must agree. Make a new legacy wish with keepers who are here.`, href: `/stories/${v.row.item_id}` });
+        }
+      }
       if (v.myRole === 'keeper') {
         const others = v.approvals.filter((a) => !a.withdrawn_at && a.keeper_id !== userId);
         const pendingFor = Array.from(new Set(others.map((a) => a.recipient_id))).filter((r) => !v.approvals.some((a) => a.keeper_id === userId && a.recipient_id === r && !a.withdrawn_at));
