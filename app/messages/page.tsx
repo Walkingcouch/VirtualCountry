@@ -87,18 +87,27 @@ export default function Messages() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refresh]);
 
-  // Check for new messages while a chat is open
+  // New messages arrive live. A check every 30 seconds while the app is on screen catches anything missed on a poor connection.
   useEffect(() => {
     if (!active || !keys || !userId) return;
-    const t = setInterval(async () => {
-      if (document.visibilityState !== 'visible') return;
+    let stopped = false;
+    const pull = async () => {
+      if (stopped || document.visibilityState !== 'visible') return;
       try {
         const list = await loadMessages(active, keys, userId, signKeys);
+        if (stopped) return;
         setMsgs((old) => (old.length === list.length ? old : list));
         markRead(userId, active.id, list.at(-1)?.created_at);
-      } catch { /* try again next time */ }
-    }, 6000);
-    return () => clearInterval(t);
+      } catch { /* the next live message or check will try again */ }
+    };
+    const sb = supabase();
+    const channel = sb.channel(`chat-${active.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${active.id}` }, () => { pull(); })
+      .subscribe();
+    const t = setInterval(pull, 30000);
+    const onShow = () => { if (document.visibilityState === 'visible') pull(); };
+    document.addEventListener('visibilitychange', onShow);
+    return () => { stopped = true; clearInterval(t); document.removeEventListener('visibilitychange', onShow); sb.removeChannel(channel); };
   }, [active, keys, userId, signKeys]);
 
   // Scroll only inside the message list, and only if the person is already at the bottom
