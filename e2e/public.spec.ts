@@ -51,6 +51,8 @@ test('security headers are set and no outside map service is allowed', async ({ 
   const res = await request.get('/login');
   const csp = res.headers()['content-security-policy'] ?? '';
   expect(csp).toContain("object-src 'none'");
+  expect(csp).toMatch(/script-src [^;]*'nonce-[A-Za-z0-9+/=]+'/);
+  expect(csp).not.toMatch(/script-src [^;]*'unsafe-inline'/);
   expect(csp).toContain("frame-ancestors 'none'");
   expect(csp).not.toMatch(/mapbox/i);
   expect(res.headers()['x-frame-options']).toBe('DENY');
@@ -68,4 +70,21 @@ test('keyboard users can reach the sign-in form in order', async ({ page }) => {
   await page.getByLabel('Email').focus();
   await page.keyboard.press('Tab');
   await expect(page.getByLabel('Password', { exact: true })).toBeFocused();
+});
+
+for (const path of ['/login', '/public', '/privacy']) {
+  test(`${path} runs with no security policy errors`, async ({ page }) => {
+    const violations: string[] = [];
+    page.on('console', (m) => { if (m.type() === 'error' && /Content Security Policy|CSP/i.test(m.text())) violations.push(m.text()); });
+    await page.goto(path);
+    await page.waitForLoadState('networkidle');
+    expect(await page.evaluate(() => document.readyState)).toBe('complete');
+    expect(violations).toEqual([]);
+  });
+}
+
+test('the nonce changes on every request', async ({ request }) => {
+  const a = (await request.get('/login')).headers()['content-security-policy'];
+  const b = (await request.get('/login')).headers()['content-security-policy'];
+  expect(a).not.toBe(b);
 });

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { connection } from 'next/server';
 import localFont from 'next/font/local';
 import './globals.css';
 import { SessionProvider } from '@/lib/session';
@@ -22,7 +23,9 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = { themeColor: '#10151B', width: 'device-width', initialScale: 1 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Every page is rendered per request so it can carry that request's script nonce (see proxy.ts).
+  await connection();
   return (
     <html lang="en-AU" className={montserrat.variable}>
       <body>
