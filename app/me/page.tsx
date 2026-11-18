@@ -5,6 +5,7 @@ import { useItems } from '@/lib/items-context';
 import { safetyCode } from '@/lib/crypto';
 import Icon from '@/components/Icon';
 import AccountSecurity from '@/components/AccountSecurity';
+import AccountDetails from '@/components/AccountDetails';
 
 export default function Me() {
   const { keys, displayName, email, signOut, lock, nameOf, org, cas, standing, userId } = useSession();
@@ -61,6 +62,8 @@ export default function Me() {
         <p className="text-sm text-mute mb-3">Download everything you can open, unlocked, to this device. You can leave at any time and take your material with you.</p>
         <button className="btn btn-ink" onClick={exportAll}>Download my data ({items.length} items)</button>
       </div>
+
+      <AccountDetails onExport={exportAll} />
 
       <div className="card p-5">
         <h2 className="font-head font-semibold mb-1">Getting back in</h2>
