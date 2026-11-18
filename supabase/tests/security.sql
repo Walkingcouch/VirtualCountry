@@ -23,6 +23,8 @@ declare
   dans   uuid := (select i.id from items i where i.holder_id = dan and not i.sacred and not i.paused and i.current_version = 1
                   and not exists (select 1 from releases r where r.source_item_id = i.id and r.status = 'pending') limit 1);
   sacred uuid := (select id from items where holder_id = rose and sacred limit 1);
+  roses  uuid := (select i.id from items i where i.holder_id = rose and not i.sacred and not i.paused and i.deleted_at is null
+                  and not exists (select 1 from releases r where r.source_item_id = i.id and r.status = 'pending') limit 1);
   chat   uuid := (select c.id from conversations c where c.kind = 'group' and c.org_id = demo
                   and (select count(*) from conversation_members m where m.conversation_id = c.id) >= 5 limit 1);
   bridge uuid := (select conversation_id from bridges where status = 'active' limit 1);
@@ -102,6 +104,10 @@ begin
     ('Cultural Authority cannot rewrite a standing', rose, '', format('with x as (update attestations set subject_id = %L where id = %L returning 1) select count(*) from x', dan, att), 'deny'),
     ('Cultural Authority cannot read an item not shared with them', rose, '', format('select count(*) from item_versions where item_id = %L', mens), 'deny'),
     ('Cultural Authority can sign a waiting release', rose, format('insert into releases (id, org_id, source_item_id, title, summary, place_label, status, created_by) values (%L, %L, %L, ''t'', ''s'', ''p'', ''pending'', %L)', rel, demo, dans, dan),
+       format('select count(*) from (select sign_release(%L, ''x'')) s', rel), 'allow'),
+    ('Cultural Authority cannot sign their own draft while another can', rose, format('insert into releases (id, org_id, source_item_id, title, summary, place_label, status, created_by) values (%L, %L, %L, ''t'', ''s'', ''p'', ''pending'', %L)', rel, demo, roses, rose),
+       format('select count(*) from (select sign_release(%L, ''x'')) s', rel), 'deny'),
+    ('a second Cultural Authority can sign it', tom, format('insert into releases (id, org_id, source_item_id, title, summary, place_label, status, created_by) values (%L, %L, %L, ''t'', ''s'', ''p'', ''pending'', %L)', rel, demo, roses, rose),
        format('select count(*) from (select sign_release(%L, ''x'')) s', rel), 'allow'),
     ('Cultural Authority can confirm and read the directory', rose, '', format('with x as (insert into attestations (org_id, subject_id, claim, issuer_id, sig) values (%1$L, %2$L, ''role:recovery_keeper'', %3$L, ''x'') returning 1) select (select count(*) from x) * (select count(*) from org_directory(%1$L))', demo, dan, rose), 'allow'),
     -- removed member

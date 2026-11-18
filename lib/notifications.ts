@@ -55,7 +55,8 @@ export async function loadNotifications(args: {
 
   if (isCa) {
     const rel = await loadReleases(org.id);
-    for (const r of rel.filter((x) => x.status === 'pending')) {
+    const otherCa = Array.from(cas).some((id) => id !== userId);
+    for (const r of rel.filter((x) => x.status === 'pending' && !(x.created_by === userId && otherCa))) {
       out.push({ id: `rel-${r.id}`, kind: 'release', text: `Public summary waiting for sign-off: ${r.title}`, href: '/releases', at: r.created_at });
     }
     caPending.forEach((issuers, subject) => {

@@ -16,6 +16,8 @@ export default function Releases() {
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState('');
   const isCa = cas.has(userId ?? '');
+  // Same rule as the database: a summary you drafted needs another Cultural Authority, when there is one.
+  const otherCa = Array.from(cas).some((id) => id !== userId);
 
   const load = useCallback(async () => {
     if (!org) return;
@@ -55,10 +57,11 @@ export default function Releases() {
               <p className="mb-2">{r.summary}</p>
               <p className="text-sm text-mute">Drafted by {r.created_by === userId ? 'you' : nameOf(r.created_by)}{r.signer_id ? ` · signed by ${r.signer_id === userId ? 'you' : nameOf(r.signer_id)}` : ''} · {r.place_label}</p>
               <div className="flex flex-wrap gap-2 mt-3">
-                {r.status === 'pending' && isCa && <button className="btn btn-gold" disabled={!!busy} onClick={() => act(r, 'sign')}>{busy === r.id + 'sign' ? 'Signing…' : 'Approve and sign'}</button>}
-                {r.status === 'pending' && isCa && <button className="btn btn-line" disabled={!!busy} onClick={() => act(r, 'reject')}>Send back</button>}
+                {r.status === 'pending' && isCa && r.created_by === userId && otherCa && <p className="text-sm text-mute basis-full">You drafted this, so another Cultural Authority checks and signs it.</p>}
+                {r.status === 'pending' && isCa && !(r.created_by === userId && otherCa) && <button className="btn btn-gold" disabled={!!busy} onClick={() => act(r, 'sign')}>{busy === r.id + 'sign' ? 'Signing…' : 'Approve and sign'}</button>}
+                {r.status === 'pending' && isCa && <button className="btn btn-line" disabled={!!busy} onClick={() => { if (confirm(`Send "${r.title}" back without publishing it? The holder can prepare a new summary.`)) act(r, 'reject'); }}>Send back</button>}
                 {r.status === 'pending' && !isCa && <span className="text-sm text-mute">Waiting for a Cultural Authority to sign.</span>}
-                {r.status === 'published' && (r.created_by === userId || isCa) && <button className="btn btn-danger" disabled={!!busy} onClick={() => act(r, 'withdraw')}>Withdraw</button>}
+                {r.status === 'published' && (r.created_by === userId || isCa) && <button className="btn btn-danger" disabled={!!busy} onClick={() => { if (confirm(`Withdraw "${r.title}" from the public page? It disappears straight away and this is in the governance log.`)) act(r, 'withdraw'); }}>Withdraw</button>}
                 {r.status === 'published' && <Link className="btn btn-line" href="/public">View public page</Link>}
               </div>
             </div>
