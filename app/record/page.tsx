@@ -1,6 +1,6 @@
 'use client';
 import { useRouter } from 'next/navigation';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSession } from '@/lib/session';
 import { useItems } from '@/lib/items-context';
 import { saveItemVersion, uploadMedia } from '@/lib/data';
@@ -30,6 +30,20 @@ export default function Record() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const recorder = useRef<MediaRecorder | null>(null);
+  const [saved, setSaved] = useState(false);
+  const dirty = !saved && (title.trim() !== '' || body.trim() !== '' || files.length > 0);
+
+  // Warn before leaving with something typed or recorded that has not been locked and saved.
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
+  // Stop the microphone if the person leaves the screen while recording.
+  useEffect(() => () => { if (recorder.current?.state === 'recording') recorder.current.stop(); }, []);
+
+  const consentGiven = (Object.values(uses) as UseAnswer[]).filter((u) => u === 'yes').length;
 
   const nearest = place ? DEMO_PLACES.reduce((a, b) => (Math.hypot(b.x - place.x, b.y - place.y) < Math.hypot(a.x - place.x, a.y - place.y) ? b : a)) : null;
 
@@ -66,6 +80,7 @@ export default function Record() {
         media, createdAt: new Date().toISOString(),
       };
       await saveItemVersion({ itemId, orgId: org.id, version: 1, payload, me: keys, myId: userId, dir, paused: false });
+      setSaved(true);
       await reload();
       router.push(`/stories/${itemId}`);
     } catch (e) {
@@ -91,19 +106,26 @@ export default function Record() {
           <textarea className="textarea" value={body} onChange={(e) => setBody(e.target.value)} placeholder="Type the story or notes here, or record audio below" aria-label="Story" maxLength={100000} />
           <div className="flex flex-wrap items-center gap-2">
             {!recording ? <button className="btn btn-ink" onClick={startRec}>● Record audio</button> : <button className="btn btn-danger" onClick={stopRec}>■ Stop</button>}
-            <label className="btn btn-line">Add photo or file<input type="file" className="hidden" accept="image/*,audio/*,video/*,.pdf" onChange={(e) => { const f = e.target.files?.[0]; if (f) setFiles((x) => [...x, { blob: f, name: f.name }]); }} /></label>
-            {files.map((f, i) => <span key={i} className="chip">{f.name} · {(f.blob.size / 1024).toFixed(0)} KB</span>)}
+            <label className="btn btn-line">Add photo or file<input type="file" className="hidden" accept="image/*,audio/*,video/*,.pdf" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; if (f.size > 6 * 1024 * 1024) { setErr(`${f.name} is ${(f.size / 1048576).toFixed(1)} MB. Files up to 6 MB can be added.`); return; } setErr(''); setFiles((x) => [...x, { blob: f, name: f.name }]); }} /></label>
+            {files.map((f, i) => <span key={i} className="chip">{f.name} · {(f.blob.size / 1024).toFixed(0)} KB <button className="underline" aria-label={`Remove ${f.name}`} onClick={() => setFiles((x) => x.filter((_, j) => j !== i))}>remove</button></span>)}
           </div>
         </div>
 
-        <div className="card p-5">
+        <details className="card p-5 group">
+          <summary className="cursor-pointer font-head font-semibold flex items-center justify-between gap-3 list-none">
+            <span>More options: place and consent</span>
+            <span className="text-sm font-normal text-mute">{place ? 'Placed on the map' : 'No place'} · {consentGiven ? `Consent for ${consentGiven} use${consentGiven === 1 ? '' : 's'}` : 'No uses agreed yet'}</span>
+          </summary>
+          <p className="text-sm text-mute mt-2">You can save without these and add them later. Until consent is given, the item is used for nothing beyond the people who can open it.</p>
+          <div className="space-y-5 mt-4">
+        <div className="border-t border-line pt-4">
           <h2 className="font-head font-semibold mb-2">Place</h2>
           <p className="text-sm text-mute mb-3">Tap the map to place it, or leave it off the map.</p>
           <DemoMap onPick={setPlace} picked={place} height={360} />
           {place && <p className="text-sm mt-2">Near {nearest?.name}. <button className="underline" onClick={() => setPlace(null)}>Remove place</button></p>}
         </div>
 
-        <div className="card p-5 space-y-3">
+        <div className="border-t border-line pt-4 space-y-3">
           <h2 className="font-head font-semibold">Consent</h2>
           <div className="grid sm:grid-cols-2 gap-2">
             <select className="select" value={method} onChange={(e) => setMethod(e.target.value as typeof method)} aria-label="How consent was given">
@@ -128,20 +150,22 @@ export default function Record() {
           </div>
           <p className="text-xs text-mute">Consent is saved with the item and can be changed at any time.</p>
         </div>
+          </div>
+        </details>
       </section>
 
       <aside className="space-y-5 lg:sticky lg:top-24 self-start">
         <div className="card p-5 space-y-3">
           <h2 className="font-head font-semibold">Who can open it</h2>
           <AccessPicker value={access} onChange={setAccess} />
-          <div>
-            <div className="text-sm font-semibold mb-1">Labels</div>
-            <div className="flex flex-wrap gap-1">
+          <details>
+            <summary className="text-sm font-semibold mb-1 cursor-pointer">Labels ({labels.length} chosen)</summary>
+            <div className="flex flex-wrap gap-1 mt-1">
               {['tk-attribution', 'tk-community-use', 'tk-verified', 'tk-non-commercial'].map((l) => (
-                <button key={l} onClick={() => setLabels((x) => x.includes(l) ? x.filter((y) => y !== l) : [...x, l])} className={`chip ${labels.includes(l) ? '!bg-ink !text-white' : ''}`}>{TK_LABELS[l]}</button>
+                <button key={l} aria-pressed={labels.includes(l)} onClick={() => setLabels((x) => x.includes(l) ? x.filter((y) => y !== l) : [...x, l])} className={`chip ${labels.includes(l) ? '!bg-ink !text-white' : ''}`}>{TK_LABELS[l]}</button>
               ))}
             </div>
-          </div>
+          </details>
         </div>
 
         <div className="card p-5 border-gold">
